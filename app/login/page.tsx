@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import CalendarBackground from '@/components/CalendarBackground';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -82,21 +83,28 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
-      <div className="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-lg w-full max-w-md animate-fadeInUp">
-        <h1 className="text-2xl font-bold text-center mb-6 text-gray-900 dark:text-white">
+    <div className="min-h-screen flex items-center justify-center p-4 relative">
+      {/* 日历背景 */}
+      <CalendarBackground />
+
+      {/* 半透明遮罩 */}
+      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" />
+
+      {/* 登录卡片 */}
+      <div className="bg-white/10 dark:bg-gray-800/80 backdrop-blur-md p-8 rounded-lg shadow-2xl w-full max-w-md animate-fadeInUp relative z-10 border border-white/20">
+        <h1 className="text-2xl font-bold text-center mb-6 text-white">
           Flight Calendar 2026
         </h1>
 
         {needsInit ? (
           <div className="space-y-4">
-            <p className="text-center text-gray-600 dark:text-gray-300">
+            <p className="text-center text-gray-300">
               首次使用，需要初始化数据库
             </p>
             <button
               onClick={handleInit}
               disabled={initializing}
-              className="w-full bg-gray-900 hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100 text-white py-2.5 px-4 rounded-lg transition-all disabled:opacity-50 btn-press font-medium"
+              className="w-full bg-white/90 hover:bg-white text-gray-900 py-2.5 px-4 rounded-lg transition-all disabled:opacity-50 btn-press font-medium"
             >
               {initializing ? '初始化中...' : '初始化数据库'}
             </button>
@@ -104,50 +112,50 @@ export default function LoginPage() {
         ) : (
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-gray-200 mb-1">
                 用户名
               </label>
               <input
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white input-focus"
+                className="w-full px-3 py-2.5 bg-white/90 border border-white/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-transparent text-gray-900 placeholder-gray-500 input-focus"
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-gray-200 mb-1">
                 密码
               </label>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white input-focus"
+                className="w-full px-3 py-2.5 bg-white/90 border border-white/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-transparent text-gray-900 placeholder-gray-500 input-focus"
                 required
               />
             </div>
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-gray-900 hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100 text-white py-2.5 px-4 rounded-lg transition-all disabled:opacity-50 btn-press font-medium"
+              className="w-full bg-white/90 hover:bg-white text-gray-900 py-2.5 px-4 rounded-lg transition-all disabled:opacity-50 btn-press font-medium"
             >
               {loading ? '登录中...' : '登录'}
             </button>
 
             <div className="relative my-4">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300 dark:border-gray-600"></div>
+                <div className="w-full border-t border-white/30"></div>
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white dark:bg-gray-800 text-gray-500">或</span>
+                <span className="px-2 bg-transparent text-gray-400">或</span>
               </div>
             </div>
 
             <button
               type="button"
               onClick={() => router.push('/?local=true')}
-              className="w-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 py-2.5 px-4 rounded-lg transition-all btn-press font-medium border border-gray-300 dark:border-gray-600"
+              className="w-full bg-white/10 hover:bg-white/20 text-gray-200 py-2.5 px-4 rounded-lg transition-all btn-press font-medium border border-white/30"
             >
               使用本地模式
             </button>
@@ -155,23 +163,23 @@ export default function LoginPage() {
         )}
 
         {error && (
-          <div className="mt-4 p-3 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 rounded">
+          <div className="mt-4 p-3 bg-red-500/20 text-red-200 rounded border border-red-500/30">
             {error}
           </div>
         )}
 
         {initLogs.length > 0 && (
-          <div className="mt-4 p-3 bg-gray-100 dark:bg-gray-700 rounded text-sm">
-            <p className="font-medium mb-2 text-gray-900 dark:text-white">初始化日志:</p>
+          <div className="mt-4 p-3 bg-white/10 rounded text-sm border border-white/20">
+            <p className="font-medium mb-2 text-white">初始化日志:</p>
             {initLogs.map((log, i) => (
               <p
                 key={i}
                 className={`font-mono text-xs ${
                   log.includes('[IMPORTANT]')
-                    ? 'text-orange-600 dark:text-orange-400 font-bold'
+                    ? 'text-orange-400 font-bold'
                     : log.includes('[ERROR]')
-                    ? 'text-red-600 dark:text-red-400'
-                    : 'text-gray-600 dark:text-gray-300'
+                    ? 'text-red-400'
+                    : 'text-gray-300'
                 }`}
               >
                 {log}
