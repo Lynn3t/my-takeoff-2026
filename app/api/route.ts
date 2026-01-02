@@ -47,11 +47,11 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { date, status, isDelete } = body;
 
-    // 3. 日期验证（保留原有逻辑）
+    // 3. 日期验证：禁止对未来日期新增/修改数据，但允许删除
     const today = new Date();
     const todayString = today.toISOString().split('T')[0];
 
-    if (date > todayString) {
+    if (date > todayString && !isDelete) {
       return NextResponse.json(
         { error: '禁止提前填写未来日期' },
         { status: 400 }

@@ -53,16 +53,20 @@ export default function Home() {
   };
 
   const toggleDay = async (dateKey: string) => {
-    const currentStatus = dataMap[dateKey]; 
+    const currentStatus = dataMap[dateKey];
     let nextStatus: number | null;
-    
+
+    // 未来日期：将数据置为空而非提交数值
+    if (dateKey > todayKey) {
+      nextStatus = null;
+    }
     // 逻辑: undefined -> 1 -> 2 -> 3 -> 4 -> 5 -> 0(红) -> undefined
-    if (currentStatus === undefined || currentStatus === null) {
+    else if (currentStatus === undefined || currentStatus === null) {
       nextStatus = 1;
     } else if (currentStatus >= 1 && currentStatus < 5) {
       nextStatus = currentStatus + 1;
     } else if (currentStatus === 5) {
-      nextStatus = 0; 
+      nextStatus = 0;
     } else {
       nextStatus = null;
     }
