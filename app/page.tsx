@@ -89,36 +89,6 @@ export default function Home() {
   const [aiConfigured, setAiConfigured] = useState(false);
   const year = 2026;
 
-  // 获取当前月份索引 (0-11)
-  const getCurrentMonth = () => {
-    const now = new Date();
-    if (now.getFullYear() < year) return 0;
-    if (now.getFullYear() > year) return 11;
-    return now.getMonth();
-  };
-
-  // 月份折叠状态 - 默认展开当前月及相邻月份
-  const currentMonth = getCurrentMonth();
-  const [expandedMonths, setExpandedMonths] = useState<Set<number>>(() => {
-    const initial = new Set<number>();
-    initial.add(currentMonth);
-    if (currentMonth > 0) initial.add(currentMonth - 1);
-    if (currentMonth < 11) initial.add(currentMonth + 1);
-    return initial;
-  });
-
-  const toggleMonthExpand = (index: number) => {
-    setExpandedMonths(prev => {
-      const next = new Set(prev);
-      if (next.has(index)) {
-        next.delete(index);
-      } else {
-        next.add(index);
-      }
-      return next;
-    });
-  };
-
   const getTodayString = () => {
     const d = new Date();
     const offset = d.getTimezoneOffset() * 60000;
@@ -282,64 +252,33 @@ export default function Home() {
     });
   }, [year]);
 
-  // 计算单月统计数据
-  const getMonthStats = (days: { dateKey: string }[]) => {
-    let successCount = 0;
-    let totalCount = 0;
-    days.forEach(({ dateKey }) => {
-      const val = dataMap[dateKey];
-      if (val !== undefined && val > 0) {
-        successCount++;
-        totalCount += val;
-      }
-    });
-    return { successCount, totalCount };
-  };
-
   const renderCalendar = () => {
-    return calendarData.map(({ name, index, firstDay, days }) => {
-      const isExpanded = expandedMonths.has(index);
-      const stats = getMonthStats(days);
-
+    return calendarData.map(({ name, firstDay, days }) => {
       return (
         <div key={name} className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
-          <h3
-            onClick={() => toggleMonthExpand(index)}
-            className="text-center font-bold mb-2 border-b pb-2 text-gray-700 cursor-pointer hover:text-blue-600 flex items-center justify-center gap-2"
-          >
-            <span className={`transform transition-transform ${isExpanded ? 'rotate-90' : ''}`}>▶</span>
+          <h3 className="text-center font-bold mb-2 border-b pb-2 text-gray-700">
             {name}
-            {!isExpanded && (
-              <span className="text-xs font-normal text-gray-500 ml-2">
-                ({stats.successCount}天 / {stats.totalCount}次)
-              </span>
-            )}
           </h3>
-
-          {isExpanded && (
-            <>
-              <div className="grid grid-cols-7 gap-1 text-center text-xs text-gray-400 mb-2">
-                <div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div>
-              </div>
-              <div className="grid grid-cols-7 gap-1">
-                {Array.from({ length: firstDay }).map((_, i) => <div key={`empty-${i}`} />)}
-                {days.map(({ d, dateKey, dayOfYear }) => {
-                  const { text, className } = getDayStatus(dateKey);
-                  return (
-                    <DayCell
-                      key={dateKey}
-                      dateKey={dateKey}
-                      dayOfYear={dayOfYear}
-                      day={d}
-                      text={text}
-                      className={className}
-                      onToggle={toggleDay}
-                    />
-                  );
-                })}
-              </div>
-            </>
-          )}
+          <div className="grid grid-cols-7 gap-1 text-center text-xs text-gray-400 mb-2">
+            <div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div>
+          </div>
+          <div className="grid grid-cols-7 gap-1">
+            {Array.from({ length: firstDay }).map((_, i) => <div key={`empty-${i}`} />)}
+            {days.map(({ d, dateKey, dayOfYear }) => {
+              const { text, className } = getDayStatus(dateKey);
+              return (
+                <DayCell
+                  key={dateKey}
+                  dateKey={dateKey}
+                  dayOfYear={dayOfYear}
+                  day={d}
+                  text={text}
+                  className={className}
+                  onToggle={toggleDay}
+                />
+              );
+            })}
+          </div>
         </div>
       );
     });
