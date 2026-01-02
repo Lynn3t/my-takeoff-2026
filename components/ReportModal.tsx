@@ -17,21 +17,23 @@ const reportTypes: { type: ReportType; label: string }[] = [
 
 export default function ReportModal({ onClose }: ReportModalProps) {
   const [selectedType, setSelectedType] = useState<ReportType>('week');
+  const [periodOffset, setPeriodOffset] = useState(0); // 0=当前周期，-1=上一周期
   const [report, setReport] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const loadReport = useCallback(async (type: ReportType) => {
+  const loadReport = useCallback(async (type: ReportType, offset: number = 0) => {
     setLoading(true);
     setError('');
     setSelectedType(type);
+    setPeriodOffset(offset);
     setReport(''); // 清空旧报告
 
     try {
       const res = await fetch('/api/ai-report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, markViewed: false, forceRefresh: true })
+        body: JSON.stringify({ type, markViewed: false, forceRefresh: true, periodOffset: offset })
       });
 
       const data = await res.json();
@@ -49,7 +51,7 @@ export default function ReportModal({ onClose }: ReportModalProps) {
   }, []);
 
   useEffect(() => {
-    loadReport('week');
+    loadReport('week', 0);
   }, [loadReport]);
 
   // 简单的 Markdown 渲染（支持基本语法）
@@ -125,7 +127,7 @@ export default function ReportModal({ onClose }: ReportModalProps) {
           {reportTypes.map((rt) => (
             <button
               key={rt.type}
-              onClick={() => loadReport(rt.type)}
+              onClick={() => loadReport(rt.type, 0)}
               disabled={loading}
               className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all btn-press ${
                 selectedType === rt.type
@@ -137,9 +139,37 @@ export default function ReportModal({ onClose }: ReportModalProps) {
             </button>
           ))}
 
+          {/* 周报的本周/上周切换 */}
+          {selectedType === 'week' && (
+            <div className="flex gap-1 ml-2 border-l border-white/20 pl-3">
+              <button
+                onClick={() => loadReport('week', 0)}
+                disabled={loading}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-all btn-press ${
+                  periodOffset === 0
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                } disabled:opacity-50`}
+              >
+                本周
+              </button>
+              <button
+                onClick={() => loadReport('week', -1)}
+                disabled={loading}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-all btn-press ${
+                  periodOffset === -1
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                } disabled:opacity-50`}
+              >
+                上周
+              </button>
+            </div>
+          )}
+
           {/* 刷新按钮 */}
           <button
-            onClick={() => loadReport(selectedType)}
+            onClick={() => loadReport(selectedType, periodOffset)}
             disabled={loading}
             className="ml-auto px-3 py-1.5 rounded-full text-sm font-medium bg-white/20 text-gray-200 hover:bg-white/30 transition-all btn-press disabled:opacity-50 flex items-center gap-1"
           >
@@ -162,7 +192,7 @@ export default function ReportModal({ onClose }: ReportModalProps) {
               <div className="text-red-400 text-5xl mb-4">!</div>
               <p className="text-red-300">{error}</p>
               <button
-                onClick={() => loadReport(selectedType)}
+                onClick={() => loadReport(selectedType, periodOffset)}
                 className="mt-4 px-4 py-2 bg-white/90 text-gray-900 rounded-lg hover:bg-white transition-all btn-press"
               >
                 重试

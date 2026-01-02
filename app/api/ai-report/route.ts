@@ -211,31 +211,31 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { type, markViewed } = body as { type: ReportType; markViewed?: boolean };
+    const { type, markViewed, periodOffset = 0 } = body as { type: ReportType; markViewed?: boolean; periodOffset?: number };
 
     if (!['week', 'month', 'quarter', 'year'].includes(type)) {
       return NextResponse.json({ error: '无效的报告类型' }, { status: 400 });
     }
 
-    // 获取上一个周期
+    // 根据periodOffset获取对应周期（0=当前周期，-1=上一周期）
     const today = new Date();
-    const prevDate = new Date(today);
+    const targetDate = new Date(today);
     switch (type) {
       case 'week':
-        prevDate.setDate(prevDate.getDate() - 7);
+        targetDate.setDate(targetDate.getDate() + periodOffset * 7);
         break;
       case 'month':
-        prevDate.setMonth(prevDate.getMonth() - 1);
+        targetDate.setMonth(targetDate.getMonth() + periodOffset);
         break;
       case 'quarter':
-        prevDate.setMonth(prevDate.getMonth() - 3);
+        targetDate.setMonth(targetDate.getMonth() + periodOffset * 3);
         break;
       case 'year':
-        prevDate.setFullYear(prevDate.getFullYear() - 1);
+        targetDate.setFullYear(targetDate.getFullYear() + periodOffset);
         break;
     }
 
-    const period = getPeriodDates(type, prevDate);
+    const period = getPeriodDates(type, targetDate);
 
     // 获取AI配置
     const { rows: configRows } = await sql`
