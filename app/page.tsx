@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useMemo, memo, useCallback } from 'react';
+import { useState, useEffect, useMemo, memo, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import ReportModal from '@/components/ReportModal';
@@ -145,7 +145,7 @@ interface CurrentUser {
   is_admin: boolean;
 }
 
-export default function Home() {
+function HomeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isLocalMode = searchParams.get('local') === 'true';
@@ -616,5 +616,29 @@ export default function Home() {
         isAuthenticated={isAuthenticated}
       />
     </main>
+  );
+}
+
+// 加载骨架屏
+function HomeLoading() {
+  return (
+    <main className="min-h-screen bg-gray-50 p-4 md:p-8 flex flex-col items-center">
+      <div className="w-full max-w-6xl flex justify-end items-center gap-4 mb-4 min-h-[24px]">
+        <div className="h-4 bg-gray-200 rounded w-20 animate-pulse" />
+      </div>
+      <h1 className="text-2xl font-bold mb-4 text-gray-800">2026 起飞记录仪</h1>
+      <div className="flex flex-wrap items-center justify-center gap-4 mb-8 bg-white p-3 rounded-xl shadow-sm px-6">
+        <div className="h-4 bg-gray-200 rounded w-48 animate-pulse" />
+      </div>
+      <CalendarSkeleton />
+    </main>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={<HomeLoading />}>
+      <HomeContent />
+    </Suspense>
   );
 }
