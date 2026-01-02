@@ -32,14 +32,30 @@ export async function POST() {
     `;
     logs.push('[OK] sessions 表已创建或已存在');
 
-    // 创建 takeoff_logs 表（如果不存在）
+    // 创建 takeoff_logs 表（如果不存在）- 带用户数据隔离
     await sql`
       CREATE TABLE IF NOT EXISTS takeoff_logs (
-        date_key VARCHAR(10) PRIMARY KEY,
-        status INTEGER NOT NULL
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        date_key VARCHAR(10) NOT NULL,
+        status INTEGER NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, date_key)
       )
     `;
     logs.push('[OK] takeoff_logs 表已创建或已存在');
+
+    // 创建索引以提升查询性能
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_takeoff_logs_user_id
+      ON takeoff_logs(user_id)
+    `;
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_takeoff_logs_date_key
+      ON takeoff_logs(date_key)
+    `;
+    logs.push('[OK] takeoff_logs 索引已创建或已存在');
 
     // 检查是否已存在管理员用户 Fimall
     const { rows: existingUsers } = await sql`
