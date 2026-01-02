@@ -57,6 +57,31 @@ export async function POST() {
     `;
     logs.push('[OK] takeoff_logs 索引已创建或已存在');
 
+    // 创建 AI 配置表（管理员配置 AI 端点）
+    await sql`
+      CREATE TABLE IF NOT EXISTS ai_config (
+        id SERIAL PRIMARY KEY,
+        config_key VARCHAR(100) UNIQUE NOT NULL,
+        config_value TEXT NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_by INTEGER REFERENCES users(id)
+      )
+    `;
+    logs.push('[OK] ai_config 表已创建或已存在');
+
+    // 创建报告查看记录表（追踪用户已查看的报告）
+    await sql`
+      CREATE TABLE IF NOT EXISTS report_viewed (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        report_type VARCHAR(20) NOT NULL,
+        period_key VARCHAR(20) NOT NULL,
+        viewed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, report_type, period_key)
+      )
+    `;
+    logs.push('[OK] report_viewed 表已创建或已存在');
+
     // 检查是否已存在管理员用户 Fimall
     const { rows: existingUsers } = await sql`
       SELECT * FROM users WHERE username = 'Fimall'

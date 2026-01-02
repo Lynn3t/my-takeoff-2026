@@ -35,6 +35,13 @@ export default function AdminPage() {
   const [editingUserId, setEditingUserId] = useState<number | null>(null);
   const [editPassword, setEditPassword] = useState('');
 
+  // AI 配置
+  const [aiEndpoint, setAiEndpoint] = useState('');
+  const [aiApiKey, setAiApiKey] = useState('');
+  const [aiModel, setAiModel] = useState('gpt-3.5-turbo');
+  const [hasApiKey, setHasApiKey] = useState(false);
+  const [savingAiConfig, setSavingAiConfig] = useState(false);
+
   const fetchUsers = useCallback(async () => {
     try {
       const res = await fetch('/api/users');
@@ -51,6 +58,23 @@ export default function AdminPage() {
     }
   }, [router]);
 
+  const fetchAiConfig = useCallback(async () => {
+    try {
+      const res = await fetch('/api/ai-config');
+      const data = await res.json();
+      if (data.config) {
+        setAiEndpoint(data.config.ai_endpoint || '');
+        setAiModel(data.config.ai_model || 'gpt-3.5-turbo');
+        setHasApiKey(data.config.has_api_key || false);
+        if (data.config.has_api_key) {
+          setAiApiKey('******');
+        }
+      }
+    } catch {
+      console.error('获取 AI 配置失败');
+    }
+  }, []);
+
   useEffect(() => {
     async function init() {
       // 获取当前用户
@@ -64,10 +88,11 @@ export default function AdminPage() {
 
       setCurrentUser(authData.user);
       await fetchUsers();
+      await fetchAiConfig();
       setLoading(false);
     }
     init();
-  }, [router, fetchUsers]);
+  }, [router, fetchUsers, fetchAiConfig]);
 
   async function handleCreateUser(e: React.FormEvent) {
     e.preventDefault();
@@ -152,6 +177,39 @@ export default function AdminPage() {
       }
     } catch {
       setError('修改密码失败');
+    }
+  }
+
+  async function handleSaveAiConfig(e: React.FormEvent) {
+    e.preventDefault();
+    setSavingAiConfig(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const res = await fetch('/api/ai-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ai_endpoint: aiEndpoint,
+          ai_api_key: aiApiKey,
+          ai_model: aiModel
+        })
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        setSuccess('AI 配置保存成功');
+        setHasApiKey(true);
+        await fetchAiConfig();
+      } else {
+        setError(data.error);
+      }
+    } catch {
+      setError('保存 AI 配置失败');
+    } finally {
+      setSavingAiConfig(false);
     }
   }
 
@@ -243,7 +301,7 @@ export default function AdminPage() {
         </div>
 
         {/* 用户列表 */}
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow mb-6">
           <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">用户列表</h2>
           <div className="overflow-x-auto">
             <table className="w-full text-left">
@@ -332,6 +390,71 @@ export default function AdminPage() {
               </tbody>
             </table>
           </div>
+        </div>
+
+        {/* AI 配置 */}
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
+          <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">AI 报告配置</h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            配置 AI 端点以启用智能起飞报告功能。支持 OpenAI 兼容的 API 端点。
+          </p>
+          <form onSubmit={handleSaveAiConfig} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                API 端点
+              </label>
+              <input
+                type="url"
+                value={aiEndpoint}
+                onChange={(e) => setAiEndpoint(e.target.value)}
+                placeholder="https://api.openai.com/v1/chat/completions"
+                className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                required
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                支持 OpenAI、Azure、或其他兼容端点
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                API Key
+              </label>
+              <input
+                type="password"
+                value={aiApiKey}
+                onChange={(e) => setAiApiKey(e.target.value)}
+                placeholder={hasApiKey ? '已配置（留空保持不变）' : '输入 API Key'}
+                className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+              />
+              {hasApiKey && (
+                <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                  API Key 已配置
+                </p>
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                模型名称
+              </label>
+              <input
+                type="text"
+                value={aiModel}
+                onChange={(e) => setAiModel(e.target.value)}
+                placeholder="gpt-3.5-turbo"
+                className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                常用：gpt-3.5-turbo、gpt-4、claude-3-sonnet 等
+              </p>
+            </div>
+            <button
+              type="submit"
+              disabled={savingAiConfig}
+              className="bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded transition disabled:opacity-50"
+            >
+              {savingAiConfig ? '保存中...' : '保存 AI 配置'}
+            </button>
+          </form>
         </div>
       </div>
     </div>

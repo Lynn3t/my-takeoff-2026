@@ -2,9 +2,18 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import ReportModal from '@/components/ReportModal';
 
 // 定义数据类型：key是日期字符串，value是数字状态
 type DataMap = Record<string, number>;
+
+type ReportType = 'week' | 'month' | 'quarter' | 'year';
+
+interface PendingReport {
+  type: ReportType;
+  periodKey: string;
+  label: string;
+}
 
 interface CurrentUser {
   id: number;
@@ -17,6 +26,9 @@ export default function Home() {
   const [dataMap, setDataMap] = useState<DataMap>({});
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [pendingReports, setPendingReports] = useState<PendingReport[]>([]);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [aiConfigured, setAiConfigured] = useState(false);
   const year = 2026;
 
   const getTodayString = () => {
@@ -43,6 +55,21 @@ export default function Home() {
       .then(json => {
         if (json.data) setDataMap(json.data);
         setLoading(false);
+      });
+
+    // 检查是否有未查看的报告
+    fetch('/api/ai-report')
+      .then(res => res.json())
+      .then(data => {
+        if (data.pendingReports && data.pendingReports.length > 0 && data.aiConfigured) {
+          setPendingReports(data.pendingReports);
+          setAiConfigured(data.aiConfigured);
+          // 自动弹出报告提示
+          setShowReportModal(true);
+        }
+      })
+      .catch(() => {
+        // 忽略错误（可能是表还未创建）
       });
   }, []);
 
@@ -229,13 +256,29 @@ export default function Home() {
         </div>
         
         {/* 导出按钮 */}
-        <button 
+        <button
             onClick={downloadCSV}
             className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-full transition-colors font-medium flex items-center gap-1"
         >
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
             导出 CSV
         </button>
+
+        {/* AI 报告按钮 */}
+        {aiConfigured && (
+          <button
+              onClick={() => setShowReportModal(true)}
+              className="px-4 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded-full transition-colors font-medium flex items-center gap-1"
+          >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+              AI 报告
+              {pendingReports.length > 0 && (
+                <span className="ml-1 bg-red-500 text-white text-[10px] rounded-full px-1.5">
+                  {pendingReports.length}
+                </span>
+              )}
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -244,6 +287,17 @@ export default function Home() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 w-full max-w-6xl">
           {renderCalendar()}
         </div>
+      )}
+
+      {/* AI 报告弹窗 */}
+      {showReportModal && pendingReports.length > 0 && (
+        <ReportModal
+          pendingReports={pendingReports}
+          onClose={() => {
+            setShowReportModal(false);
+            setPendingReports([]);
+          }}
+        />
       )}
     </main>
   );
