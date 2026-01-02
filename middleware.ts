@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // 不需要认证的路径
-const publicPaths = ['/login', '/api/auth', '/api/init'];
+const publicPaths = ['/login', '/api/auth', '/api/init', '/api'];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -12,6 +12,11 @@ export function middleware(request: NextRequest) {
 
   // 静态资源不需要认证
   if (pathname.startsWith('/_next') || pathname.includes('.')) {
+    return NextResponse.next();
+  }
+
+  // 主页允许未登录访问（离线模式）
+  if (pathname === '/') {
     return NextResponse.next();
   }
 

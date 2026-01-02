@@ -1,8 +1,59 @@
 'use client';
-import { useState, useEffect, useMemo, memo } from 'react';
+import { useState, useEffect, useMemo, memo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import ReportModal from '@/components/ReportModal';
+
+// 离线状态指示器组件
+const OfflineIndicator = memo(function OfflineIndicator({
+  isOnline,
+  pendingCount,
+  isSyncing,
+  onManualSync,
+  isAuthenticated
+}: {
+  isOnline: boolean;
+  pendingCount: number;
+  isSyncing: boolean;
+  onManualSync: () => void;
+  isAuthenticated: boolean | null;
+}) {
+  // 未登录时不显示（本地模式由顶部栏显示）
+  if (isAuthenticated === false) return null;
+  // 已登录且在线且无待同步时不显示
+  if (isOnline && pendingCount === 0) return null;
+
+  return (
+    <div className={`fixed bottom-4 right-4 px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 text-sm z-50 ${
+      isOnline ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
+    }`}>
+      {!isOnline && (
+        <>
+          <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+          <span>离线模式</span>
+        </>
+      )}
+      {pendingCount > 0 && (
+        <>
+          <span className="bg-orange-500 text-white text-xs px-2 py-0.5 rounded-full">
+            {pendingCount} 条待同步
+          </span>
+          {isOnline && !isSyncing && (
+            <button
+              onClick={onManualSync}
+              className="text-blue-600 hover:text-blue-700 underline text-xs"
+            >
+              立即同步
+            </button>
+          )}
+          {isSyncing && (
+            <span className="text-xs text-gray-600">同步中...</span>
+          )}
+        </>
+      )}
+    </div>
+  );
+});
 
 // 骨架屏组件 - 日历月份
 const CalendarSkeleton = memo(function CalendarSkeleton() {
@@ -62,8 +113,31 @@ const DayCell = memo(function DayCell({ dateKey, dayOfYear, day, text, className
 // 月份名称常量 - 避免每次渲染重新创建
 const MONTHS = ["一月", "二月", "三月", "四月", "五月", "六月", "七月", "八月", "九月", "十月", "十一月", "十二月"] as const;
 
+// 本地存储 key
+const LOCAL_STORAGE_KEY = 'takeoff_local_data';
+
 // 定义数据类型：key是日期字符串，value是数字状态
 type DataMap = Record<string, number>;
+
+// 本地存储工具函数
+const loadLocalData = (): DataMap => {
+  if (typeof window === 'undefined') return {};
+  try {
+    const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
+    return saved ? JSON.parse(saved) : {};
+  } catch {
+    return {};
+  }
+};
+
+const saveLocalData = (data: DataMap) => {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data));
+  } catch (e) {
+    console.error('本地存储失败', e);
+  }
+};
 
 type ReportType = 'week' | 'month' | 'quarter' | 'year';
 
@@ -84,9 +158,13 @@ export default function Home() {
   const [dataMap, setDataMap] = useState<DataMap>({});
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null); // null=未知, true=已登录, false=未登录
   const [pendingReports, setPendingReports] = useState<PendingReport[]>([]);
   const [showReportModal, setShowReportModal] = useState(false);
   const [aiConfigured, setAiConfigured] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
+  const [pendingSyncCount, setPendingSyncCount] = useState(0);
+  const [isSyncing, setIsSyncing] = useState(false);
   const year = 2026;
 
   const getTodayString = () => {
@@ -105,17 +183,78 @@ export default function Home() {
       .then(data => {
         if (data.authenticated) {
           setCurrentUser(data.user);
+          setIsAuthenticated(true);
+        } else {
+          setIsAuthenticated(false);
         }
+      })
+      .catch(() => {
+        setIsAuthenticated(false);
       });
 
+    // 获取数据 - 根据登录状态决定数据来源
     fetch('/api')
       .then(res => res.json())
-      .then(json => {
-        if (json.data) setDataMap(json.data);
+      .then(async (json) => {
+        if (json.authenticated === false) {
+          // 未登录：使用本地存储
+          setIsAuthenticated(false);
+          const localData = loadLocalData();
+          setDataMap(localData);
+        } else if (json.data) {
+          // 已登录：合并云端和本地数据（云端优先）
+          const cloudData = json.data as DataMap;
+          const localData = loadLocalData();
+
+          // 找出本地独有的数据（云端没有的）
+          const localOnlyEntries: Array<{ date: string; status: number }> = [];
+          for (const [dateKey, status] of Object.entries(localData)) {
+            if (!(dateKey in cloudData)) {
+              localOnlyEntries.push({ date: dateKey, status });
+            }
+          }
+
+          // 合并数据：云端 + 本地独有
+          const mergedData = { ...localData, ...cloudData }; // 云端覆盖本地
+          setDataMap(mergedData);
+
+          // 将本地独有数据上传到云端
+          if (localOnlyEntries.length > 0) {
+            console.log(`[Sync] 发现 ${localOnlyEntries.length} 条本地数据需要上传`);
+            for (const entry of localOnlyEntries) {
+              try {
+                await fetch('/api', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    date: entry.date,
+                    status: entry.status,
+                    isDelete: false
+                  })
+                });
+              } catch (e) {
+                console.error(`[Sync] 上传失败: ${entry.date}`, e);
+              }
+            }
+            console.log('[Sync] 本地数据上传完成');
+          }
+
+          // 清空本地存储（已合并到云端）
+          if (Object.keys(localData).length > 0) {
+            localStorage.removeItem(LOCAL_STORAGE_KEY);
+            console.log('[Sync] 本地缓存已清空');
+          }
+        }
+        setLoading(false);
+      })
+      .catch(() => {
+        // 网络错误：使用本地存储
+        const localData = loadLocalData();
+        setDataMap(localData);
         setLoading(false);
       });
 
-    // 检查是否有未查看的报告
+    // 检查是否有未查看的报告（仅登录用户）
     fetch('/api/ai-report')
       .then(res => res.json())
       .then(data => {
@@ -127,9 +266,77 @@ export default function Home() {
         }
       })
       .catch(() => {
-        // 忽略错误（可能是表还未创建）
+        // 忽略错误（可能是表还未创建或未登录）
       });
   }, []);
+
+  // 离线状态管理
+  useEffect(() => {
+    // 初始化在线状态
+    setIsOnline(navigator.onLine);
+
+    const handleOnline = () => {
+      setIsOnline(true);
+      // 在线后请求同步
+      if (navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({ type: 'MANUAL_SYNC' });
+        setIsSyncing(true);
+      }
+    };
+
+    const handleOffline = () => {
+      setIsOnline(false);
+    };
+
+    // 监听 Service Worker 消息
+    const handleSWMessage = (event: MessageEvent) => {
+      const { data } = event;
+
+      if (data.type === 'OFFLINE_SAVED') {
+        setPendingSyncCount(prev => prev + 1);
+      }
+
+      if (data.type === 'SYNC_COMPLETE' || data.type === 'MANUAL_SYNC_COMPLETE') {
+        setPendingSyncCount(data.remaining || 0);
+        setIsSyncing(false);
+        // 同步完成后刷新数据
+        if (data.synced > 0) {
+          fetch('/api')
+            .then(res => res.json())
+            .then(json => {
+              if (json.data) setDataMap(json.data);
+            });
+        }
+      }
+
+      if (data.type === 'PENDING_COUNT') {
+        setPendingSyncCount(data.count);
+      }
+    };
+
+    // 获取初始待同步数量
+    if (navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({ type: 'GET_PENDING_COUNT' });
+    }
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    navigator.serviceWorker.addEventListener('message', handleSWMessage);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      navigator.serviceWorker.removeEventListener('message', handleSWMessage);
+    };
+  }, []);
+
+  // 手动同步函数
+  const handleManualSync = useCallback(() => {
+    if (navigator.serviceWorker.controller && isOnline) {
+      navigator.serviceWorker.controller.postMessage({ type: 'MANUAL_SYNC' });
+      setIsSyncing(true);
+    }
+  }, [isOnline]);
 
   const handleLogout = async () => {
     await fetch('/api/auth', { method: 'DELETE' });
@@ -164,14 +371,21 @@ export default function Home() {
     }
     setDataMap(newData);
 
+    // 未登录时：只保存到本地
+    if (isAuthenticated === false) {
+      saveLocalData(newData);
+      return;
+    }
+
+    // 已登录时：保存到云端
     try {
       await fetch('/api', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          date: dateKey, 
-          status: nextStatus, 
-          isDelete: nextStatus === null 
+        body: JSON.stringify({
+          date: dateKey,
+          status: nextStatus,
+          isDelete: nextStatus === null
         })
       });
     } catch (e) {
@@ -306,9 +520,23 @@ export default function Home() {
     <main className="min-h-screen bg-gray-50 p-4 md:p-8 flex flex-col items-center">
       {/* 用户信息栏 */}
       <div className="w-full max-w-6xl flex justify-end items-center gap-4 mb-4 min-h-[24px]">
-        {currentUser === null && loading ? (
+        {isAuthenticated === null && loading ? (
           <UserBarSkeleton />
+        ) : isAuthenticated === false ? (
+          // 未登录：本地模式
+          <>
+            <span className="text-sm text-orange-600 flex items-center gap-1">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+              </svg>
+              本地模式
+            </span>
+            <Link href="/login" className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+              登录同步
+            </Link>
+          </>
         ) : currentUser ? (
+          // 已登录
           <>
             <span className="text-sm text-gray-600">
               {currentUser.username}
@@ -382,6 +610,15 @@ export default function Home() {
           }}
         />
       )}
+
+      {/* 离线状态指示器 */}
+      <OfflineIndicator
+        isOnline={isOnline}
+        pendingCount={pendingSyncCount}
+        isSyncing={isSyncing}
+        onManualSync={handleManualSync}
+        isAuthenticated={isAuthenticated}
+      />
     </main>
   );
 }

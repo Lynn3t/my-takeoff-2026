@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(tsconfig:*)",
-      "Bash(next.config \")"
+      "Bash(next.config \")",
+      "Bash(cat:*)"
     ]
   }
 }
