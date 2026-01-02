@@ -219,7 +219,20 @@ export default function Home() {
   const dbValues = Object.values(dataMap);
   const totalCount = dbValues.reduce((acc, v) => (v > 0 ? acc + v : acc), 0);
   const successDays = dbValues.filter(v => v > 0).length;
-  const recordedFails = dbValues.filter(v => v === 0).length;
+
+  // 计算2026年已过天数
+  const getPassedDays = () => {
+    const today = new Date(todayKey);
+    const startOfYear = new Date(year, 0, 1);
+    // 如果今天不在2026年，返回0或365
+    if (today < startOfYear) return 0;
+    const endOfYear = new Date(year, 11, 31);
+    if (today > endOfYear) return 365;
+    return Math.floor((today.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+  };
+  const passedDays = getPassedDays();
+  const successRate = passedDays > 0 ? ((successDays / passedDays) * 100).toFixed(1) : '0';
+  const avgPerDay = passedDays > 0 ? (totalCount / passedDays).toFixed(2) : '0';
 
   return (
     <main className="min-h-screen bg-gray-50 p-4 md:p-8 flex flex-col items-center">
@@ -250,9 +263,9 @@ export default function Home() {
       
       <div className="flex flex-wrap items-center justify-center gap-4 mb-8 bg-white p-3 rounded-xl shadow-sm px-6">
         <div className="flex gap-4 text-sm font-medium border-r pr-4 mr-2">
-            <span className="text-green-600">总起飞: {totalCount} 次</span>
-            <span className="text-green-600">天数: {successDays}</span>
-            <span className="text-red-500">归零: {recordedFails}</span>
+            <span className="text-green-600">起飞天数: {successDays}天 / {passedDays}天 - {successRate}%</span>
+            <span className="text-blue-600">起飞次数: {totalCount}</span>
+            <span className="text-purple-600">平均每天: {avgPerDay}次</span>
         </div>
         
         {/* 导出按钮 */}
