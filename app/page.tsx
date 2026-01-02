@@ -519,7 +519,7 @@ function HomeContent() {
   const recordedDays = getPassedDays(); // 到今天为止的天数都视为有记录（无数据=0）
 
   // DEBUG
-  console.log('[Stats Debug]', { todayKey, recordedDays, successDays, dbValues: Object.keys(dataMap) });
+  console.warn('🔥🔥🔥 [Stats Debug]', { todayKey, recordedDays, successDays, dataMapKeys: Object.keys(dataMap) });
 
   const successRate = recordedDays > 0 ? ((successDays / recordedDays) * 100).toFixed(1) : '0';
   const avgPerDay = recordedDays > 0 ? (totalCount / recordedDays).toFixed(2) : '0';
@@ -566,7 +566,12 @@ function HomeContent() {
       </div>
 
       <h1 className="text-2xl font-bold mb-4 text-gray-800">2026 起飞记录仪</h1>
-      
+
+      {/* DEBUG INFO */}
+      <div className="text-xs text-red-500 mb-2">
+        DEBUG: todayKey={todayKey}, recordedDays={recordedDays}, successDays={successDays}, keys={Object.keys(dataMap).join(',')}
+      </div>
+
       <div className="flex flex-wrap items-center justify-center gap-4 mb-8 bg-white p-3 rounded-xl shadow-sm px-6">
         <div className="flex gap-4 text-sm font-medium border-r pr-4 mr-2">
             <span className="text-green-600">起飞天数: {successDays}天 / {recordedDays}天 - {successRate}%</span>
