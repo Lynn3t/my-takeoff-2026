@@ -1,15 +1,16 @@
 'use client';
 import { useState, useEffect } from 'react';
 
+// 定义数据类型：key是日期字符串，value是数字状态
+type DataMap = Record<string, number>;
+
 export default function Home() {
-  const [dataMap, setDataMap] = useState({});
+  const [dataMap, setDataMap] = useState<DataMap>({});
   const [loading, setLoading] = useState(true);
   const year = 2026;
 
-  // 获取今天的日期字符串 (用于判断是否过期)
   const getTodayString = () => {
     const d = new Date();
-    // 调整为中国时区或其他你需要的逻辑
     const offset = d.getTimezoneOffset() * 60000;
     const local = new Date(d.getTime() - offset); 
     return local.toISOString().split('T')[0];
@@ -17,7 +18,6 @@ export default function Home() {
 
   const todayKey = getTodayString();
 
-  // 初始化加载数据
   useEffect(() => {
     fetch('/api')
       .then(res => res.json())
@@ -27,66 +27,57 @@ export default function Home() {
       });
   }, []);
 
-  // 点击切换状态逻辑
-  const toggleDay = async (dateKey) => {
-    // 获取当前数据库里的真实状态（不包含自动补零的视觉状态）
+  // 这里加上了 : string 类型注解
+  const toggleDay = async (dateKey: string) => {
     const currentStatus = dataMap[dateKey]; 
-
-    let nextStatus;
+    let nextStatus: number | null;
     
-    // 逻辑: undefined(空) -> 1 -> 2 -> 3 -> 4 -> 5 -> 0(红) -> undefined(重置)
+    // 逻辑: undefined -> 1 -> 2 -> 3 -> 4 -> 5 -> 0(红) -> undefined
     if (currentStatus === undefined || currentStatus === null) {
       nextStatus = 1;
     } else if (currentStatus >= 1 && currentStatus < 5) {
       nextStatus = currentStatus + 1;
     } else if (currentStatus === 5) {
-      nextStatus = 0; // 封顶后变红
+      nextStatus = 0; 
     } else {
-      nextStatus = null; // 0 之后重置为空，方便纠错
+      nextStatus = null;
     }
 
-    // 1. 乐观更新 UI
     const newData = { ...dataMap };
     if (nextStatus === null) {
-      delete newData[dateKey]; // 删除数据
+      delete newData[dateKey];
     } else {
       newData[dateKey] = nextStatus;
     }
     setDataMap(newData);
 
-    // 2. 后台保存
     try {
       await fetch('/api', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           date: dateKey, 
-          status: nextStatus, // 发送 null 会触发 API 删除或置空逻辑
+          status: nextStatus, 
           isDelete: nextStatus === null 
         })
       });
     } catch (e) {
       console.error("保存失败", e);
-      // 可以在这里加个 toast 提示
     }
   };
 
-  // 计算某个日期的显示状态（含自动补零逻辑）
-  const getDisplayInfo = (dateKey) => {
+  const getDisplayInfo = (dateKey: string) => {
     const dbValue = dataMap[dateKey];
     
-    // 1. 如果数据库有记录 (0-5)，直接用
     if (dbValue !== undefined && dbValue !== null) {
-      if (dbValue === 0) return { text: "0", className: "bg-red-500 text-white" }; // 失败
-      return { text: dbValue, className: "bg-green-500 text-white font-bold" };   // 起飞 N 次
+      if (dbValue === 0) return { text: "0", className: "bg-red-500 text-white" }; 
+      return { text: dbValue, className: "bg-green-500 text-white font-bold" };
     }
 
-    // 2. 如果数据库没记录，但日期已过 (自动变红 0)
     if (dateKey < todayKey) {
-      return { text: "0", className: "bg-red-500 text-white opacity-60" }; // 过期自动变红(稍微淡一点区分)
+      return { text: "0", className: "bg-red-500 text-white opacity-60" };
     }
 
-    // 3. 未来或今天，且没记录 (灰色待定)
     return { text: "", className: "bg-gray-200" };
   };
 
@@ -109,6 +100,7 @@ export default function Home() {
               const d = i + 1;
               const dateKey = `${year}-${String(index + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
               
+              // @ts-ignore
               const { text, className } = getDisplayInfo(dateKey);
 
               return (
@@ -127,20 +119,9 @@ export default function Home() {
     });
   };
 
-  // 统计逻辑
-  let totalCount = 0; // 总起飞次数
-  let failDays = 0;   // 0次的天数（含自动补齐）
-  let successDays = 0; // 有起飞的天数
-
-  // 遍历每一天来统计（因为涉及到自动补零，不能只遍历 database）
-  // 简单起见，我们这里只统计数据库里的，或者你可以写个循环遍历到今天
-  // 这里展示：仅统计数据库已有记录 + 过期未记录的算作失败
-  // 简易版统计（只统计显性数据）：
   const dbValues = Object.values(dataMap);
-  totalCount = dbValues.reduce((acc, v) => (v > 0 ? acc + v : acc), 0);
-  successDays = dbValues.filter(v => v > 0).length;
-  // 失败天数 = 数据库里的0 + (今天之前的总天数 - 数据库里有记录的天数)
-  // 这个计算比较繁琐，暂且只显示数据库记录的 0
+  const totalCount = dbValues.reduce((acc, v) => (v > 0 ? acc + v : acc), 0);
+  const successDays = dbValues.filter(v => v > 0).length;
   const recordedFails = dbValues.filter(v => v === 0).length;
 
   return (

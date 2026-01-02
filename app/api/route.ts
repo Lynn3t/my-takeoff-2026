@@ -4,26 +4,25 @@ import { NextResponse } from 'next/server';
 export async function GET() {
   try {
     const { rows } = await sql`SELECT * FROM takeoff_logs`;
-    const dataMap = {};
+    // 显式声明类型 accumulator
+    const dataMap: Record<string, number> = {};
     rows.forEach(row => {
       dataMap[row.date_key] = row.status;
     });
     return NextResponse.json({ data: dataMap });
-  } catch (error) {
+  } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
-export async function POST(request) {
+export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { date, status, isDelete } = body;
 
     if (isDelete) {
-      // 如果前端传了删除标记，从数据库移除该条目
       await sql`DELETE FROM takeoff_logs WHERE date_key = ${date}`;
     } else {
-      // 插入或更新
       await sql`
         INSERT INTO takeoff_logs (date_key, status)
         VALUES (${date}, ${status})
@@ -33,7 +32,7 @@ export async function POST(request) {
     }
 
     return NextResponse.json({ success: true });
-  } catch (error) {
+  } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
