@@ -518,6 +518,9 @@ function HomeContent() {
   };
   const recordedDays = getPassedDays(); // 到今天为止的天数都视为有记录（无数据=0）
 
+  // DEBUG
+  console.log('[Stats Debug]', { todayKey, recordedDays, successDays, dbValues: Object.keys(dataMap) });
+
   const successRate = recordedDays > 0 ? ((successDays / recordedDays) * 100).toFixed(1) : '0';
   const avgPerDay = recordedDays > 0 ? (totalCount / recordedDays).toFixed(2) : '0';
 
