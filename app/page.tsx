@@ -160,16 +160,22 @@ export default function Home() {
             {Array.from({ length: daysInMonth }).map((_, i) => {
               const d = i + 1;
               const dateKey = `${year}-${String(index + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-              
+
+              // 计算当年的第几天
+              const startOfYear = new Date(year, 0, 1);
+              const currentDate = new Date(year, index, d);
+              const dayOfYear = Math.floor((currentDate.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
               const { text, className } = getDayStatus(dateKey);
 
               return (
-                <div 
+                <div
                   key={dateKey}
                   onClick={() => toggleDay(dateKey)}
-                  className={`aspect-square flex items-center justify-center text-sm rounded cursor-pointer transition-all hover:scale-105 select-none ${className}`}
+                  className={`aspect-square flex flex-col items-center justify-center text-sm rounded cursor-pointer transition-all hover:scale-105 select-none ${className}`}
                 >
-                  {text || d}
+                  <span className="text-[8px] opacity-60 leading-none">{dayOfYear}</span>
+                  <span className="leading-none">{text || d}</span>
                 </div>
               );
             })}

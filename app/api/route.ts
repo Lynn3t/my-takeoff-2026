@@ -20,6 +20,18 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { date, status, isDelete } = body;
 
+    // 获取今天的日期（使用服务器时区）
+    const today = new Date();
+    const todayString = today.toISOString().split('T')[0];
+
+    // 禁止填写未来日期
+    if (date > todayString) {
+      return NextResponse.json(
+        { error: '禁止提前填写未来日期' },
+        { status: 400 }
+      );
+    }
+
     if (isDelete) {
       await sql`DELETE FROM takeoff_logs WHERE date_key = ${date}`;
     } else {
