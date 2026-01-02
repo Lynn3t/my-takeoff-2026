@@ -509,11 +509,13 @@ function HomeContent() {
   // 计算2026年已过天数（过期无数据的也算0，计入统计）
   const getPassedDays = () => {
     if (!todayKey) return 0;
-    const today = new Date(todayKey);
+    // 解析日期字符串，避免时区问题
+    const [y, m, d] = todayKey.split('-').map(Number);
+    if (y < year) return 0;
+    if (y > year) return 365;
+    // 使用本地时间创建日期对象
+    const today = new Date(y, m - 1, d);
     const startOfYear = new Date(year, 0, 1);
-    if (today < startOfYear) return 0;
-    const endOfYear = new Date(year, 11, 31);
-    if (today > endOfYear) return 365;
     return Math.floor((today.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24)) + 1;
   };
   const recordedDays = getPassedDays(); // 到今天为止的天数都视为有记录（无数据=0）
