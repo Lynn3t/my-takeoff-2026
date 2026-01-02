@@ -1,12 +1,22 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 // 定义数据类型：key是日期字符串，value是数字状态
 type DataMap = Record<string, number>;
 
+interface CurrentUser {
+  id: number;
+  username: string;
+  is_admin: boolean;
+}
+
 export default function Home() {
+  const router = useRouter();
   const [dataMap, setDataMap] = useState<DataMap>({});
   const [loading, setLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const year = 2026;
 
   const getTodayString = () => {
@@ -19,6 +29,15 @@ export default function Home() {
   const todayKey = getTodayString();
 
   useEffect(() => {
+    // 获取当前用户信息
+    fetch('/api/auth')
+      .then(res => res.json())
+      .then(data => {
+        if (data.authenticated) {
+          setCurrentUser(data.user);
+        }
+      });
+
     fetch('/api')
       .then(res => res.json())
       .then(json => {
@@ -26,6 +45,12 @@ export default function Home() {
         setLoading(false);
       });
   }, []);
+
+  const handleLogout = async () => {
+    await fetch('/api/auth', { method: 'DELETE' });
+    router.push('/login');
+    router.refresh();
+  };
 
   const toggleDay = async (dateKey: string) => {
     const currentStatus = dataMap[dateKey]; 
@@ -161,7 +186,30 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-gray-50 p-4 md:p-8 flex flex-col items-center">
-      <h1 className="text-2xl font-bold mb-4 text-gray-800">2026 起飞记录仪 🚀</h1>
+      {/* 用户信息栏 */}
+      <div className="w-full max-w-6xl flex justify-end items-center gap-4 mb-4">
+        {currentUser && (
+          <>
+            <span className="text-sm text-gray-600">
+              {currentUser.username}
+              {currentUser.is_admin && <span className="ml-1 text-purple-600">(管理员)</span>}
+            </span>
+            {currentUser.is_admin && (
+              <Link href="/admin" className="text-sm text-blue-600 hover:text-blue-700">
+                用户管理
+              </Link>
+            )}
+            <button
+              onClick={handleLogout}
+              className="text-sm text-red-600 hover:text-red-700"
+            >
+              退出登录
+            </button>
+          </>
+        )}
+      </div>
+
+      <h1 className="text-2xl font-bold mb-4 text-gray-800">2026 起飞记录仪</h1>
       
       <div className="flex flex-wrap items-center justify-center gap-4 mb-8 bg-white p-3 rounded-xl shadow-sm px-6">
         <div className="flex gap-4 text-sm font-medium border-r pr-4 mr-2">
