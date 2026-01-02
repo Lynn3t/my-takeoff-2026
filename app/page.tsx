@@ -1,8 +1,66 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, memo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import ReportModal from '@/components/ReportModal';
+
+// 骨架屏组件 - 日历月份
+const CalendarSkeleton = memo(function CalendarSkeleton() {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 w-full max-w-6xl">
+      {Array.from({ length: 12 }).map((_, i) => (
+        <div key={i} className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+          <div className="h-6 bg-gray-200 rounded w-16 mx-auto mb-2 animate-pulse" />
+          <div className="grid grid-cols-7 gap-1 mb-2">
+            {Array.from({ length: 7 }).map((_, j) => (
+              <div key={j} className="h-3 bg-gray-100 rounded animate-pulse" />
+            ))}
+          </div>
+          <div className="grid grid-cols-7 gap-1">
+            {Array.from({ length: 35 }).map((_, j) => (
+              <div key={j} className="aspect-square bg-gray-100 rounded animate-pulse" />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+});
+
+// 用户信息栏骨架屏
+const UserBarSkeleton = memo(function UserBarSkeleton() {
+  return (
+    <div className="flex items-center gap-4">
+      <div className="h-4 bg-gray-200 rounded w-20 animate-pulse" />
+      <div className="h-4 bg-gray-200 rounded w-16 animate-pulse" />
+    </div>
+  );
+});
+
+// 日期单元格组件 - 使用 memo 避免不必要的重渲染
+interface DayCellProps {
+  dateKey: string;
+  dayOfYear: number;
+  day: number;
+  text: string;
+  className: string;
+  onToggle: (dateKey: string) => void;
+}
+
+const DayCell = memo(function DayCell({ dateKey, dayOfYear, day, text, className, onToggle }: DayCellProps) {
+  return (
+    <div
+      onClick={() => onToggle(dateKey)}
+      className={`aspect-square flex flex-col items-center justify-center text-sm rounded cursor-pointer transition-all hover:scale-105 select-none ${className}`}
+    >
+      <span className="text-[8px] opacity-60 leading-none">{dayOfYear}</span>
+      <span className="leading-none">{text || day}</span>
+    </div>
+  );
+});
+
+// 月份名称常量 - 避免每次渲染重新创建
+const MONTHS = ["一月", "二月", "三月", "四月", "五月", "六月", "七月", "八月", "九月", "十月", "十一月", "十二月"] as const;
 
 // 定义数据类型：key是日期字符串，value是数字状态
 type DataMap = Record<string, number>;
@@ -30,6 +88,36 @@ export default function Home() {
   const [showReportModal, setShowReportModal] = useState(false);
   const [aiConfigured, setAiConfigured] = useState(false);
   const year = 2026;
+
+  // 获取当前月份索引 (0-11)
+  const getCurrentMonth = () => {
+    const now = new Date();
+    if (now.getFullYear() < year) return 0;
+    if (now.getFullYear() > year) return 11;
+    return now.getMonth();
+  };
+
+  // 月份折叠状态 - 默认展开当前月及相邻月份
+  const currentMonth = getCurrentMonth();
+  const [expandedMonths, setExpandedMonths] = useState<Set<number>>(() => {
+    const initial = new Set<number>();
+    initial.add(currentMonth);
+    if (currentMonth > 0) initial.add(currentMonth - 1);
+    if (currentMonth < 11) initial.add(currentMonth + 1);
+    return initial;
+  });
+
+  const toggleMonthExpand = (index: number) => {
+    setExpandedMonths(prev => {
+      const next = new Set(prev);
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+      return next;
+    });
+  };
 
   const getTodayString = () => {
     const d = new Date();
@@ -173,44 +261,85 @@ export default function Home() {
     document.body.removeChild(link);
   };
 
-  const renderCalendar = () => {
-    const months = ["一月", "二月", "三月", "四月", "五月", "六月", "七月", "八月", "九月", "十月", "十一月", "十二月"];
-    
-    return months.map((name, index) => {
+  // 预计算日历数据 - 避免每次渲染重复计算
+  const calendarData = useMemo(() => {
+    const startOfYear = new Date(year, 0, 1);
+
+    return MONTHS.map((name, index) => {
       const daysInMonth = new Date(year, index + 1, 0).getDate();
       const firstDay = new Date(year, index, 1).getDay();
-      
+
+      const days = Array.from({ length: daysInMonth }).map((_, i) => {
+        const d = i + 1;
+        const dateKey = `${year}-${String(index + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        const currentDate = new Date(year, index, d);
+        const dayOfYear = Math.floor((currentDate.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+        return { d, dateKey, dayOfYear };
+      });
+
+      return { name, index, firstDay, days };
+    });
+  }, [year]);
+
+  // 计算单月统计数据
+  const getMonthStats = (days: { dateKey: string }[]) => {
+    let successCount = 0;
+    let totalCount = 0;
+    days.forEach(({ dateKey }) => {
+      const val = dataMap[dateKey];
+      if (val !== undefined && val > 0) {
+        successCount++;
+        totalCount += val;
+      }
+    });
+    return { successCount, totalCount };
+  };
+
+  const renderCalendar = () => {
+    return calendarData.map(({ name, index, firstDay, days }) => {
+      const isExpanded = expandedMonths.has(index);
+      const stats = getMonthStats(days);
+
       return (
         <div key={name} className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
-          <h3 className="text-center font-bold mb-2 border-b pb-2 text-gray-700">{name}</h3>
-          <div className="grid grid-cols-7 gap-1 text-center text-xs text-gray-400 mb-2">
-            <div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div>
-          </div>
-          <div className="grid grid-cols-7 gap-1">
-            {Array.from({ length: firstDay }).map((_, i) => <div key={`empty-${i}`} />)}
-            {Array.from({ length: daysInMonth }).map((_, i) => {
-              const d = i + 1;
-              const dateKey = `${year}-${String(index + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+          <h3
+            onClick={() => toggleMonthExpand(index)}
+            className="text-center font-bold mb-2 border-b pb-2 text-gray-700 cursor-pointer hover:text-blue-600 flex items-center justify-center gap-2"
+          >
+            <span className={`transform transition-transform ${isExpanded ? 'rotate-90' : ''}`}>▶</span>
+            {name}
+            {!isExpanded && (
+              <span className="text-xs font-normal text-gray-500 ml-2">
+                ({stats.successCount}天 / {stats.totalCount}次)
+              </span>
+            )}
+          </h3>
 
-              // 计算当年的第几天
-              const startOfYear = new Date(year, 0, 1);
-              const currentDate = new Date(year, index, d);
-              const dayOfYear = Math.floor((currentDate.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-
-              const { text, className } = getDayStatus(dateKey);
-
-              return (
-                <div
-                  key={dateKey}
-                  onClick={() => toggleDay(dateKey)}
-                  className={`aspect-square flex flex-col items-center justify-center text-sm rounded cursor-pointer transition-all hover:scale-105 select-none ${className}`}
-                >
-                  <span className="text-[8px] opacity-60 leading-none">{dayOfYear}</span>
-                  <span className="leading-none">{text || d}</span>
-                </div>
-              );
-            })}
-          </div>
+          {isExpanded && (
+            <>
+              <div className="grid grid-cols-7 gap-1 text-center text-xs text-gray-400 mb-2">
+                <div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div>
+              </div>
+              <div className="grid grid-cols-7 gap-1">
+                {Array.from({ length: firstDay }).map((_, i) => <div key={`empty-${i}`} />)}
+                {days.map(({ d, dateKey, dayOfYear }) => {
+                  const { text, className } = getDayStatus(dateKey);
+                  return (
+                    <DayCell
+                      key={dateKey}
+                      dateKey={dateKey}
+                      dayOfYear={dayOfYear}
+                      day={d}
+                      text={text}
+                      className={className}
+                      onToggle={toggleDay}
+                    />
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
       );
     });
@@ -237,8 +366,10 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-gray-50 p-4 md:p-8 flex flex-col items-center">
       {/* 用户信息栏 */}
-      <div className="w-full max-w-6xl flex justify-end items-center gap-4 mb-4">
-        {currentUser && (
+      <div className="w-full max-w-6xl flex justify-end items-center gap-4 mb-4 min-h-[24px]">
+        {currentUser === null && loading ? (
+          <UserBarSkeleton />
+        ) : currentUser ? (
           <>
             <span className="text-sm text-gray-600">
               {currentUser.username}
@@ -256,7 +387,7 @@ export default function Home() {
               退出登录
             </button>
           </>
-        )}
+        ) : null}
       </div>
 
       <h1 className="text-2xl font-bold mb-4 text-gray-800">2026 起飞记录仪</h1>
@@ -295,7 +426,7 @@ export default function Home() {
       </div>
 
       {loading ? (
-        <div className="text-gray-500 animate-pulse">数据加载中...</div>
+        <CalendarSkeleton />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 w-full max-w-6xl">
           {renderCalendar()}
