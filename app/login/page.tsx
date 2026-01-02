@@ -83,7 +83,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
-      <div className="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-lg w-full max-w-md">
+      <div className="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-lg w-full max-w-md animate-fadeInUp">
         <h1 className="text-2xl font-bold text-center mb-6 text-gray-900 dark:text-white">
           Flight Calendar 2026
         </h1>
@@ -96,7 +96,7 @@ export default function LoginPage() {
             <button
               onClick={handleInit}
               disabled={initializing}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded transition disabled:opacity-50"
+              className="w-full bg-gray-900 hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100 text-white py-2.5 px-4 rounded-lg transition-all disabled:opacity-50 btn-press font-medium"
             >
               {initializing ? '初始化中...' : '初始化数据库'}
             </button>
@@ -111,7 +111,7 @@ export default function LoginPage() {
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white input-focus"
                 required
               />
             </div>
@@ -123,14 +123,14 @@ export default function LoginPage() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white input-focus"
                 required
               />
             </div>
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded transition disabled:opacity-50"
+              className="w-full bg-gray-900 hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100 text-white py-2.5 px-4 rounded-lg transition-all disabled:opacity-50 btn-press font-medium"
             >
               {loading ? '登录中...' : '登录'}
             </button>
@@ -147,7 +147,7 @@ export default function LoginPage() {
             <button
               type="button"
               onClick={() => router.push('/?local=true')}
-              className="w-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 py-2 px-4 rounded transition"
+              className="w-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 py-2.5 px-4 rounded-lg transition-all btn-press font-medium border border-gray-300 dark:border-gray-600"
             >
               使用本地模式
             </button>

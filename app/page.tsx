@@ -139,14 +139,6 @@ const saveLocalData = (data: DataMap) => {
   }
 };
 
-type ReportType = 'week' | 'month' | 'quarter' | 'year';
-
-interface PendingReport {
-  type: ReportType;
-  periodKey: string;
-  label: string;
-}
-
 interface CurrentUser {
   id: number;
   username: string;
@@ -161,7 +153,6 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null); // null=未知, true=已登录, false=未登录
-  const [pendingReports, setPendingReports] = useState<PendingReport[]>([]);
   const [showReportModal, setShowReportModal] = useState(false);
   const [aiConfigured, setAiConfigured] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
@@ -270,15 +261,12 @@ export default function Home() {
         setLoading(false);
       });
 
-    // 检查是否有未查看的报告（仅登录用户）
+    // 检查 AI 是否已配置（仅登录用户）
     fetch('/api/ai-report')
       .then(res => res.json())
       .then(data => {
-        if (data.pendingReports && data.pendingReports.length > 0 && data.aiConfigured) {
-          setPendingReports(data.pendingReports);
-          setAiConfigured(data.aiConfigured);
-          // 自动弹出报告提示
-          setShowReportModal(true);
+        if (data.aiConfigured) {
+          setAiConfigured(true);
         }
       })
       .catch(() => {
@@ -586,7 +574,7 @@ export default function Home() {
         {/* 导出按钮 */}
         <button
             onClick={downloadCSV}
-            className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-full transition-colors font-medium flex items-center gap-1"
+            className="px-4 py-1.5 bg-gray-900 hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100 text-white text-xs rounded-full transition-all font-medium flex items-center gap-1 btn-press"
         >
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
             导出 CSV
@@ -596,15 +584,10 @@ export default function Home() {
         {aiConfigured && (
           <button
               onClick={() => setShowReportModal(true)}
-              className="px-4 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded-full transition-colors font-medium flex items-center gap-1"
+              className="px-4 py-1.5 bg-gray-900 hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100 text-white text-xs rounded-full transition-all font-medium flex items-center gap-1 btn-press"
           >
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
               AI 报告
-              {pendingReports.length > 0 && (
-                <span className="ml-1 bg-red-500 text-white text-[10px] rounded-full px-1.5">
-                  {pendingReports.length}
-                </span>
-              )}
           </button>
         )}
       </div>
@@ -618,13 +601,9 @@ export default function Home() {
       )}
 
       {/* AI 报告弹窗 */}
-      {showReportModal && pendingReports.length > 0 && (
+      {showReportModal && (
         <ReportModal
-          pendingReports={pendingReports}
-          onClose={() => {
-            setShowReportModal(false);
-            setPendingReports([]);
-          }}
+          onClose={() => setShowReportModal(false)}
         />
       )}
 

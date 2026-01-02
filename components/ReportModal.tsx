@@ -1,49 +1,37 @@
 'use client';
 
-import { useState, useEffect, ReactElement } from 'react';
+import { useState, useEffect, ReactElement, useCallback } from 'react';
 
 type ReportType = 'week' | 'month' | 'quarter' | 'year';
 
-interface PendingReport {
-  type: ReportType;
-  periodKey: string;
-  label: string;
-}
-
 interface ReportModalProps {
-  pendingReports: PendingReport[];
   onClose: () => void;
 }
 
-const reportTypeNames: Record<ReportType, string> = {
-  week: '周报',
-  month: '月报',
-  quarter: '季报',
-  year: '年报'
-};
+const reportTypes: { type: ReportType; label: string }[] = [
+  { type: 'week', label: '周报' },
+  { type: 'month', label: '月报' },
+  { type: 'quarter', label: '季报' },
+  { type: 'year', label: '年报' }
+];
 
-export default function ReportModal({ pendingReports, onClose }: ReportModalProps) {
-  const [selectedType, setSelectedType] = useState<ReportType>(pendingReports[0]?.type || 'week');
+export default function ReportModal({ onClose }: ReportModalProps) {
+  const [selectedType, setSelectedType] = useState<ReportType>('week');
   const [report, setReport] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    if (pendingReports.length > 0) {
-      loadReport(pendingReports[0].type);
-    }
-  }, []);
-
-  async function loadReport(type: ReportType) {
+  const loadReport = useCallback(async (type: ReportType) => {
     setLoading(true);
     setError('');
     setSelectedType(type);
+    setReport(''); // 清空旧报告
 
     try {
       const res = await fetch('/api/ai-report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, markViewed: true })
+        body: JSON.stringify({ type, markViewed: false, forceRefresh: true })
       });
 
       const data = await res.json();
@@ -58,7 +46,11 @@ export default function ReportModal({ pendingReports, onClose }: ReportModalProp
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    loadReport('week');
+  }, [loadReport]);
 
   // 简单的 Markdown 渲染（支持基本语法）
   function renderMarkdown(text: string) {
@@ -71,13 +63,13 @@ export default function ReportModal({ pendingReports, onClose }: ReportModalProp
     for (const line of lines) {
       if (line.startsWith('## ')) {
         elements.push(
-          <h2 key={key++} className="text-xl font-bold mt-4 mb-2 text-purple-700 dark:text-purple-400">
+          <h2 key={key++} className="text-xl font-bold mt-4 mb-2 text-gray-800 dark:text-gray-200">
             {line.slice(3)}
           </h2>
         );
       } else if (line.startsWith('### ')) {
         elements.push(
-          <h3 key={key++} className="text-lg font-semibold mt-3 mb-1 text-gray-800 dark:text-gray-200">
+          <h3 key={key++} className="text-lg font-semibold mt-3 mb-1 text-gray-700 dark:text-gray-300">
             {line.slice(4)}
           </h3>
         );
@@ -115,41 +107,54 @@ export default function ReportModal({ pendingReports, onClose }: ReportModalProp
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-        {/* 头部 */}
-        <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center bg-gradient-to-r from-purple-600 to-blue-600">
-          <h2 className="text-xl font-bold text-white">AI 起飞报告</h2>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 animate-fadeIn">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-scaleIn">
+        {/* 头部 - 黑白风格 */}
+        <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center bg-gray-900 dark:bg-white">
+          <h2 className="text-xl font-bold text-white dark:text-gray-900">AI 起飞报告</h2>
           <button
             onClick={onClose}
-            className="text-white hover:text-gray-200 text-2xl leading-none"
+            className="text-gray-300 hover:text-white dark:text-gray-600 dark:hover:text-gray-900 text-2xl leading-none transition-colors btn-press"
           >
             &times;
           </button>
         </div>
 
         {/* 报告类型选择 */}
-        <div className="p-3 border-b dark:border-gray-700 flex gap-2 flex-wrap bg-gray-50 dark:bg-gray-900">
-          {pendingReports.map((pr) => (
+        <div className="p-3 border-b dark:border-gray-700 flex gap-2 flex-wrap bg-gray-50 dark:bg-gray-900 items-center">
+          {reportTypes.map((rt) => (
             <button
-              key={pr.type}
-              onClick={() => loadReport(pr.type)}
-              className={`px-3 py-1.5 rounded-full text-sm font-medium transition ${
-                selectedType === pr.type
-                  ? 'bg-purple-600 text-white'
+              key={rt.type}
+              onClick={() => loadReport(rt.type)}
+              disabled={loading}
+              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all btn-press ${
+                selectedType === rt.type
+                  ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
                   : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
-              }`}
+              } disabled:opacity-50`}
             >
-              {reportTypeNames[pr.type]} · {pr.label}
+              {rt.label}
             </button>
           ))}
+
+          {/* 刷新按钮 */}
+          <button
+            onClick={() => loadReport(selectedType)}
+            disabled={loading}
+            className="ml-auto px-3 py-1.5 rounded-full text-sm font-medium bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition-all btn-press disabled:opacity-50 flex items-center gap-1"
+          >
+            <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            刷新
+          </button>
         </div>
 
         {/* 报告内容 */}
         <div className="flex-1 overflow-y-auto p-6">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-12">
-              <div className="w-12 h-12 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+              <div className="w-12 h-12 border-4 border-gray-900 dark:border-white border-t-transparent dark:border-t-transparent rounded-full animate-spin mb-4"></div>
               <p className="text-gray-600 dark:text-gray-400">AI 正在分析你的起飞数据...</p>
             </div>
           ) : error ? (
@@ -158,7 +163,7 @@ export default function ReportModal({ pendingReports, onClose }: ReportModalProp
               <p className="text-red-600 dark:text-red-400">{error}</p>
               <button
                 onClick={() => loadReport(selectedType)}
-                className="mt-4 px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
+                className="mt-4 px-4 py-2 bg-gray-900 dark:bg-white dark:text-gray-900 text-white rounded-lg hover:bg-gray-800 dark:hover:bg-gray-100 transition-all btn-press"
               >
                 重试
               </button>
@@ -177,7 +182,7 @@ export default function ReportModal({ pendingReports, onClose }: ReportModalProp
           </p>
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded transition"
+            className="px-4 py-2 bg-gray-600 hover:bg-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 text-white rounded-lg transition-all btn-press"
           >
             关闭
           </button>

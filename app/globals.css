@@ -24,3 +24,74 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* 移动端触摸反馈 - 按钮按下效果 */
+.btn-press {
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+.btn-press:active {
+  transform: scale(0.95);
+  opacity: 0.85;
+}
+
+/* 卡片淡入上浮动画 */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fadeInUp {
+  animation: fadeInUp 0.35s ease-out forwards;
+}
+
+/* 表格行悬停过渡 */
+.row-hover {
+  transition: background-color 0.2s ease;
+}
+.row-hover:hover {
+  background-color: rgba(0, 0, 0, 0.03);
+}
+@media (prefers-color-scheme: dark) {
+  .row-hover:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+}
+
+/* 输入框聚焦动画 */
+.input-focus {
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+/* 卡片入场延迟 - 用于多个卡片依次出现 */
+.animate-delay-1 { animation-delay: 0.05s; }
+.animate-delay-2 { animation-delay: 0.1s; }
+.animate-delay-3 { animation-delay: 0.15s; }
+
+/* 弹窗背景淡入 */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.animate-fadeIn {
+  animation: fadeIn 0.2s ease-out forwards;
+}
+
+/* 弹窗内容缩放进入 */
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.animate-scaleIn {
+  animation: scaleIn 0.25s ease-out forwards;
+}
