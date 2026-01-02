@@ -134,6 +134,23 @@ export default function LoginPage() {
             >
               {loading ? '登录中...' : '登录'}
             </button>
+
+            <div className="relative my-4">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-300 dark:border-gray-600"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-white dark:bg-gray-800 text-gray-500">或</span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => router.push('/?local=true')}
+              className="w-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 py-2 px-4 rounded transition"
+            >
+              使用本地模式
+            </button>
           </form>
         )}
 

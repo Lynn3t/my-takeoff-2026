@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useMemo, memo, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import ReportModal from '@/components/ReportModal';
 
@@ -155,6 +155,8 @@ interface CurrentUser {
 
 export default function Home() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isLocalMode = searchParams.get('local') === 'true';
   const [dataMap, setDataMap] = useState<DataMap>({});
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
@@ -165,16 +167,20 @@ export default function Home() {
   const [isOnline, setIsOnline] = useState(true);
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [todayKey, setTodayKey] = useState<string>('');
   const year = 2026;
 
   const getTodayString = () => {
     const d = new Date();
     const offset = d.getTimezoneOffset() * 60000;
-    const local = new Date(d.getTime() - offset); 
+    const local = new Date(d.getTime() - offset);
     return local.toISOString().split('T')[0];
   };
 
-  const todayKey = getTodayString();
+  // 在客户端设置今日日期，避免 hydration 不匹配
+  useEffect(() => {
+    setTodayKey(getTodayString());
+  }, []);
 
   useEffect(() => {
     // 获取当前用户信息
@@ -184,12 +190,22 @@ export default function Home() {
         if (data.authenticated) {
           setCurrentUser(data.user);
           setIsAuthenticated(true);
-        } else {
+        } else if (isLocalMode) {
+          // 用户选择了本地模式
           setIsAuthenticated(false);
+        } else {
+          // 未登录且非本地模式：跳转到登录页面
+          router.push('/login');
         }
       })
       .catch(() => {
-        setIsAuthenticated(false);
+        if (isLocalMode) {
+          // 网络错误但用户选择了本地模式
+          setIsAuthenticated(false);
+        } else {
+          // 网络错误：跳转到登录页面
+          router.push('/login');
+        }
       });
 
     // 获取数据 - 根据登录状态决定数据来源
@@ -268,7 +284,7 @@ export default function Home() {
       .catch(() => {
         // 忽略错误（可能是表还未创建或未登录）
       });
-  }, []);
+  }, [isLocalMode, router]);
 
   // 离线状态管理
   useEffect(() => {
@@ -502,19 +518,20 @@ export default function Home() {
   const totalCount = dbValues.reduce((acc, v) => (v > 0 ? acc + v : acc), 0);
   const successDays = dbValues.filter(v => v > 0).length;
 
-  // 计算2026年已过天数
+  // 计算2026年已过天数（过期无数据的也算0，计入统计）
   const getPassedDays = () => {
+    if (!todayKey) return 0;
     const today = new Date(todayKey);
     const startOfYear = new Date(year, 0, 1);
-    // 如果今天不在2026年，返回0或365
     if (today < startOfYear) return 0;
     const endOfYear = new Date(year, 11, 31);
     if (today > endOfYear) return 365;
     return Math.floor((today.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24)) + 1;
   };
-  const passedDays = getPassedDays();
-  const successRate = passedDays > 0 ? ((successDays / passedDays) * 100).toFixed(1) : '0';
-  const avgPerDay = passedDays > 0 ? (totalCount / passedDays).toFixed(2) : '0';
+  const recordedDays = getPassedDays(); // 到今天为止的天数都视为有记录（无数据=0）
+
+  const successRate = recordedDays > 0 ? ((successDays / recordedDays) * 100).toFixed(1) : '0';
+  const avgPerDay = recordedDays > 0 ? (totalCount / recordedDays).toFixed(2) : '0';
 
   return (
     <main className="min-h-screen bg-gray-50 p-4 md:p-8 flex flex-col items-center">
@@ -561,7 +578,7 @@ export default function Home() {
       
       <div className="flex flex-wrap items-center justify-center gap-4 mb-8 bg-white p-3 rounded-xl shadow-sm px-6">
         <div className="flex gap-4 text-sm font-medium border-r pr-4 mr-2">
-            <span className="text-green-600">起飞天数: {successDays}天 / {passedDays}天 - {successRate}%</span>
+            <span className="text-green-600">起飞天数: {successDays}天 / {recordedDays}天 - {successRate}%</span>
             <span className="text-blue-600">起飞次数: {totalCount}</span>
             <span className="text-purple-600">平均每天: {avgPerDay}次</span>
         </div>
