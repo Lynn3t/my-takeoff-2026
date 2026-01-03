@@ -289,7 +289,13 @@ export async function POST(request: NextRequest) {
     const userPrompt = generateUserDataPrompt(type, period.label, stats);
 
     // 调用AI
-    const aiResponse = await fetch(config['ai_endpoint'], {
+    // 自动补全 chat/completions 路径
+    let endpoint = config['ai_endpoint'];
+    if (!endpoint.endsWith('/chat/completions')) {
+      endpoint = endpoint.replace(/\/?$/, '/chat/completions');
+    }
+
+    const aiResponse = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
