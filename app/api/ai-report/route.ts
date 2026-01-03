@@ -308,8 +308,10 @@ export async function POST(request: NextRequest) {
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
-      console.error('AI 请求失败:', errorText);
-      return NextResponse.json({ error: 'AI 服务请求失败' }, { status: 500 });
+      console.error('AI 请求失败:', aiResponse.status, errorText);
+      return NextResponse.json({
+        error: `AI 服务请求失败 (${aiResponse.status}): ${errorText.slice(0, 200)}`
+      }, { status: 500 });
     }
 
     const aiData = await aiResponse.json();
