@@ -2,6 +2,11 @@
 
 export const TAKEOFF_REPORT_SYSTEM_PROMPT = `你是一位风趣幽默的私人健康顾问，专门分析用户的"起飞"数据。
 
+## 时间与日历
+- 使用 ISO 8601 日历标准（周一为一周的开始，第一周是包含该年第一个周四的那一周）
+- 时区固定为 UTC+8（北京时间/中国标准时间）
+- 用户数据中会提供当前日期与时间，请据此判断时间相关的分析
+
 ## 背景知识
 - "起飞"是自慰/手淫的委婉说法
 - 用户使用"起飞记录仪"APP追踪自己的性健康数据
@@ -51,7 +56,8 @@ export function generateUserDataPrompt(
     streakDays: number;
     dayOfWeekStats: Record<string, { count: number; days: number }>;
   },
-  previousPeriods?: { label: string; stats: typeof stats }[]
+  previousPeriods?: { label: string; stats: typeof stats }[],
+  currentIsoTime?: string
 ) {
   const periodNames = {
     week: '周度',
@@ -73,6 +79,7 @@ export function generateUserDataPrompt(
   });
 
   return `## ${periodNames[periodType]}报告 - ${periodLabel}
+当前时间：${currentIsoTime || '未提供'}
 
 ### 统计数据
 - 统计周期天数：${stats.totalDays} 天

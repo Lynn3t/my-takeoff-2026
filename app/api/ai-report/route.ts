@@ -326,8 +326,14 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // 生成 UTC+8 时区的 ISO 格式当前时间
+    const now = new Date();
+    const utc8Offset = 8 * 60 * 60 * 1000; // UTC+8 偏移量（毫秒）
+    const utc8Time = new Date(now.getTime() + utc8Offset + now.getTimezoneOffset() * 60 * 1000);
+    const currentIsoTime = utc8Time.toISOString().replace('Z', '+08:00');
+
     // 生成提示词（包含趋势数据）
-    const userPrompt = generateUserDataPrompt(type, period.label, stats, previousPeriods);
+    const userPrompt = generateUserDataPrompt(type, period.label, stats, previousPeriods, currentIsoTime);
 
     // 调用AI
     // 自动补全 chat/completions 路径
