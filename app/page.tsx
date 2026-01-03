@@ -88,6 +88,76 @@ const UserBarSkeleton = memo(function UserBarSkeleton() {
   );
 });
 
+// 安装提示组件 - 根据设备类型显示不同内容
+type InstallPromptType = 'none' | 'android' | 'ios';
+
+const InstallPrompt = memo(function InstallPrompt() {
+  const [promptType, setPromptType] = useState<InstallPromptType>('none');
+
+  useEffect(() => {
+    // 检测设备和环境
+    const ua = navigator.userAgent.toLowerCase();
+    const isAndroid = /android/.test(ua);
+    const isIOS = /iphone|ipad|ipod/.test(ua);
+    const isMobile = isAndroid || isIOS;
+
+    // 检测是否在 standalone 模式（PWA/TWA/已安装的 APK）
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+      || (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
+
+    // 电脑或已安装的应用：不显示
+    if (!isMobile || isStandalone) {
+      setPromptType('none');
+      return;
+    }
+
+    // 安卓浏览器：显示下载 APK
+    if (isAndroid) {
+      setPromptType('android');
+      return;
+    }
+
+    // iOS 浏览器：显示添加到主屏幕
+    if (isIOS) {
+      setPromptType('ios');
+      return;
+    }
+  }, []);
+
+  if (promptType === 'none') return null;
+
+  if (promptType === 'android') {
+    return (
+      <a
+        href="/FC26.apk"
+        download="FC26.apk"
+        className="flex items-center gap-1 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs rounded-full transition-all"
+      >
+        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+        </svg>
+        安装 App
+      </a>
+    );
+  }
+
+  if (promptType === 'ios') {
+    return (
+      <button
+        onClick={() => alert('点击底部分享按钮 → 选择"添加到主屏幕"')}
+        className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-full transition-all"
+      >
+        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v12m0-12L8 8m4-4l4 4M6 20h12" />
+        </svg>
+        添加到主屏幕
+      </button>
+    );
+  }
+
+  return null;
+});
+
 // 日期单元格组件 - 使用 memo 避免不必要的重渲染
 interface DayCellProps {
   dateKey: string;
@@ -541,6 +611,7 @@ function HomeContent() {
             <Link href="/login" className="text-sm text-blue-600 hover:text-blue-700 font-medium">
               登录同步
             </Link>
+            <InstallPrompt />
           </>
         ) : currentUser ? (
           // 已登录
@@ -560,6 +631,7 @@ function HomeContent() {
             >
               退出登录
             </button>
+            <InstallPrompt />
           </>
         ) : null}
       </div>
