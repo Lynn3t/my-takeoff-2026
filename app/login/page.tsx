@@ -162,6 +162,23 @@ export default function LoginPage() {
           </form>
         )}
 
+        {/* APK 下载入口 */}
+        <div className="mt-6 pt-6 border-t border-white/20">
+          <a
+            href="/FC26.apk"
+            download="FC26.apk"
+            className="w-full flex items-center justify-center gap-2 bg-green-600/80 hover:bg-green-600 text-white py-2.5 px-4 rounded-lg transition-all btn-press font-medium"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            下载 Android 客户端
+          </a>
+          <p className="text-center text-gray-400 text-xs mt-2">
+            安装后可离线使用，数据自动同步
+          </p>
+        </div>
+
         {error && (
           <div className="mt-4 p-3 bg-red-500/20 text-red-200 rounded border border-red-500/30">
             {error}

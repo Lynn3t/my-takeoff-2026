@@ -22,13 +22,13 @@ function getPeriodDates(type: ReportType, date: Date): { start: string; end: str
 
       const startStr = formatDate(monday);
       const endStr = formatDate(sunday);
-      const weekNum = getWeekNumber(monday);
+      const isoWeek = getISOWeek(monday);
 
       return {
         start: startStr,
         end: endStr,
-        label: `${year}年第${weekNum}周`,
-        periodKey: `${year}-W${weekNum.toString().padStart(2, '0')}`
+        label: `${isoWeek.year}年第${isoWeek.week}周`,
+        periodKey: `${isoWeek.year}-W${isoWeek.week.toString().padStart(2, '0')}`
       };
     }
     case 'month': {
@@ -67,10 +67,17 @@ function formatDate(date: Date): string {
   return date.toISOString().split('T')[0];
 }
 
-function getWeekNumber(date: Date): number {
-  const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
-  const pastDaysOfYear = (date.getTime() - firstDayOfYear.getTime()) / 86400000;
-  return Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
+// ISO 8601 周数计算：返回 { year, week }
+// 一年的第一周是包含该年第一个周四的那一周
+function getISOWeek(date: Date): { year: number; week: number } {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  // 设置到本周四（ISO周从周一开始，周四决定周属于哪一年）
+  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+  // 获取该周四所在年份的1月1日
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  // 计算周数
+  const week = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  return { year: d.getUTCFullYear(), week };
 }
 
 // 计算统计数据
@@ -250,7 +257,41 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'AI 未配置，请联系管理员' }, { status: 400 });
     }
 
-    // 获取用户数据
+    // 获取当前周期和前3个周期的数据用于趋势分析
+    const previousPeriods: { label: string; stats: ReturnType<typeof calculateStats> }[] = [];
+
+    // 计算前3个周期的日期范围
+    for (let i = 1; i <= 3; i++) {
+      const prevDate = new Date(targetDate);
+      switch (type) {
+        case 'week':
+          prevDate.setDate(prevDate.getDate() - i * 7);
+          break;
+        case 'month':
+          prevDate.setMonth(prevDate.getMonth() - i);
+          break;
+        case 'quarter':
+          prevDate.setMonth(prevDate.getMonth() - i * 3);
+          break;
+        case 'year':
+          prevDate.setFullYear(prevDate.getFullYear() - i);
+          break;
+      }
+      const prevPeriod = getPeriodDates(type, prevDate);
+
+      const { rows: prevDataRows } = await sql`
+        SELECT date_key, status FROM takeoff_logs
+        WHERE user_id = ${user.id}
+          AND date_key >= ${prevPeriod.start}
+          AND date_key <= ${prevPeriod.end}
+        ORDER BY date_key
+      `;
+
+      const prevStats = calculateStats(prevDataRows as { date_key: string; status: number }[], prevPeriod.start, prevPeriod.end);
+      previousPeriods.push({ label: prevPeriod.label, stats: prevStats });
+    }
+
+    // 获取当前周期用户数据
     const { rows: dataRows } = await sql`
       SELECT date_key, status FROM takeoff_logs
       WHERE user_id = ${user.id}
@@ -259,7 +300,7 @@ export async function POST(request: NextRequest) {
       ORDER BY date_key
     `;
 
-    // 计算统计
+    // 计算当前周期统计
     const stats = calculateStats(dataRows as { date_key: string; status: number }[], period.start, period.end);
 
     // 如果没有数据，返回提示
@@ -285,8 +326,8 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 生成提示词
-    const userPrompt = generateUserDataPrompt(type, period.label, stats);
+    // 生成提示词（包含趋势数据）
+    const userPrompt = generateUserDataPrompt(type, period.label, stats, previousPeriods);
 
     // 调用AI
     // 自动补全 chat/completions 路径

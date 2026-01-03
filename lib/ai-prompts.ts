@@ -50,7 +50,8 @@ export function generateUserDataPrompt(
     maxCountDate: string;
     streakDays: number;
     dayOfWeekStats: Record<string, { count: number; days: number }>;
-  }
+  },
+  previousPeriods?: { label: string; stats: typeof stats }[]
 ) {
   const periodNames = {
     week: '周度',
@@ -88,6 +89,16 @@ export function generateUserDataPrompt(
 ${Object.entries(stats.dayOfWeekStats)
   .map(([day, data]) => `- ${dayNames[parseInt(day)]}：${data.count} 次，${data.days} 天有记录`)
   .join('\n')}
+${previousPeriods && previousPeriods.length > 0 ? `
+### 历史趋势（用于对比分析）
+${previousPeriods.map(p => `
+**${p.label}**
+- 起飞总次数：${p.stats.totalCount} 次
+- 日均次数：${p.stats.avgPerDay.toFixed(2)} 次
+- 成功天数：${p.stats.successDays} 天
+- 归零天数：${p.stats.zeroDays} 天`).join('\n')}
 
+请结合历史数据分析趋势变化（是上升、下降还是稳定），并给出相应建议。
+` : ''}
 请根据以上数据生成${periodNames[periodType]}起飞报告。`;
 }
