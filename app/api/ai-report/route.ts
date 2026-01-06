@@ -244,6 +244,22 @@ export async function POST(request: NextRequest) {
 
     const period = getPeriodDates(type, targetDate);
 
+    // 对于"本周"（periodOffset === 0），使用今天作为结束日期
+    // 即使数据不完整也提交给AI分析
+    let actualEndDate = period.end;
+    let isPartialPeriod = false;
+    if (type === 'week' && periodOffset === 0) {
+      const todayStr = formatDate(today);
+      if (todayStr < period.end) {
+        actualEndDate = todayStr;
+        isPartialPeriod = true;
+      }
+    }
+    // 计算实际数据天数（从开始到实际结束日期）
+    const startDateObj = new Date(period.start);
+    const actualEndDateObj = new Date(actualEndDate);
+    const actualDataDays = Math.floor((actualEndDateObj.getTime() - startDateObj.getTime()) / 86400000) + 1;
+
     // 获取AI配置
     const { rows: configRows } = await sql`
       SELECT config_key, config_value FROM ai_config
@@ -291,17 +307,17 @@ export async function POST(request: NextRequest) {
       previousPeriods.push({ label: prevPeriod.label, stats: prevStats });
     }
 
-    // 获取当前周期用户数据
+    // 获取当前周期用户数据（使用actualEndDate）
     const { rows: dataRows } = await sql`
       SELECT date_key, status FROM takeoff_logs
       WHERE user_id = ${user.id}
         AND date_key >= ${period.start}
-        AND date_key <= ${period.end}
+        AND date_key <= ${actualEndDate}
       ORDER BY date_key
     `;
 
-    // 计算当前周期统计
-    const stats = calculateStats(dataRows as { date_key: string; status: number }[], period.start, period.end);
+    // 计算当前周期统计（使用actualEndDate）
+    const stats = calculateStats(dataRows as { date_key: string; status: number }[], period.start, actualEndDate);
 
     // 如果没有数据，返回提示
     if (stats.recordedDays === 0) {
@@ -332,8 +348,15 @@ export async function POST(request: NextRequest) {
     const utc8Time = new Date(now.getTime() + utc8Offset + now.getTimezoneOffset() * 60 * 1000);
     const currentIsoTime = utc8Time.toISOString().replace('Z', '+08:00');
 
-    // 生成提示词（包含趋势数据）
-    const userPrompt = generateUserDataPrompt(type, period.label, stats, previousPeriods, currentIsoTime);
+    // 生成提示词（包含趋势数据和部分周期信息）
+    const userPrompt = generateUserDataPrompt(
+      type,
+      period.label,
+      stats,
+      previousPeriods,
+      currentIsoTime,
+      isPartialPeriod ? { actualDataDays, fullPeriodDays: 7 } : undefined
+    );
 
     // 调用AI
     // 自动补全 chat/completions 路径

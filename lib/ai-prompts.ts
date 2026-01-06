@@ -57,7 +57,8 @@ export function generateUserDataPrompt(
     dayOfWeekStats: Record<string, { count: number; days: number }>;
   },
   previousPeriods?: { label: string; stats: typeof stats }[],
-  currentIsoTime?: string
+  currentIsoTime?: string,
+  partialPeriodInfo?: { actualDataDays: number; fullPeriodDays: number }
 ) {
   const periodNames = {
     week: '周度',
@@ -78,9 +79,14 @@ export function generateUserDataPrompt(
     }
   });
 
+  // 部分周期提示
+  const partialPeriodNote = partialPeriodInfo
+    ? `\n**注意：本周数据尚不完整，目前只有 ${partialPeriodInfo.actualDataDays} 天的数据（完整周期为 ${partialPeriodInfo.fullPeriodDays} 天）。请基于现有数据进行分析，并提醒用户这是截至目前的统计。**\n`
+    : '';
+
   return `## ${periodNames[periodType]}报告 - ${periodLabel}
 当前时间：${currentIsoTime || '未提供'}
-
+${partialPeriodNote}
 ### 统计数据
 - 统计周期天数：${stats.totalDays} 天
 - 有记录天数：${stats.recordedDays} 天

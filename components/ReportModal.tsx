@@ -1,11 +1,18 @@
 'use client';
 
-import { useState, useEffect, ReactElement, useCallback } from 'react';
+import { useState, useEffect, ReactElement, useCallback, useRef } from 'react';
 
 type ReportType = 'week' | 'month' | 'quarter' | 'year';
 
 interface ReportModalProps {
   onClose: () => void;
+}
+
+interface ReportStats {
+  avgPerDay: number;
+  totalDays: number;
+  recordedDays: number;
+  totalCount: number;
 }
 
 const reportTypes: { type: ReportType; label: string }[] = [
@@ -15,12 +22,65 @@ const reportTypes: { type: ReportType; label: string }[] = [
   { type: 'year', label: '年报' }
 ];
 
+// 根据日均次数获取音乐配置
+function getMusicConfig(avgPerDay: number): { file: string; startTime: number } {
+  if (avgPerDay < 0.3) {
+    return { file: '/110.mp3', startTime: 70 }; // 1:10
+  } else if (avgPerDay <= 0.7) {
+    return { file: '/010.mp3', startTime: 10 }; // 0:10
+  } else {
+    return { file: '/008.mp3', startTime: 8 }; // 0:08
+  }
+}
+
 export default function ReportModal({ onClose }: ReportModalProps) {
   const [selectedType, setSelectedType] = useState<ReportType>('week');
   const [periodOffset, setPeriodOffset] = useState(0); // 0=当前周期，-1=上一周期
   const [report, setReport] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [stats, setStats] = useState<ReportStats | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // 播放音乐
+  const playMusic = useCallback((avgPerDay: number) => {
+    // 停止当前播放的音乐
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+
+    const config = getMusicConfig(avgPerDay);
+    const audio = new Audio(config.file);
+    audio.currentTime = config.startTime;
+    audio.loop = true;
+    audio.volume = 0.5;
+    audio.play().catch(() => {
+      // 忽略自动播放被阻止的错误
+    });
+    audioRef.current = audio;
+  }, []);
+
+  // 停止音乐
+  const stopMusic = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+  }, []);
+
+  // 组件卸载时停止音乐
+  useEffect(() => {
+    return () => {
+      stopMusic();
+    };
+  }, [stopMusic]);
+
+  // 关闭时停止音乐
+  const handleClose = useCallback(() => {
+    stopMusic();
+    onClose();
+  }, [stopMusic, onClose]);
 
   const loadReport = useCallback(async (type: ReportType, offset: number = 0) => {
     setLoading(true);
@@ -28,6 +88,8 @@ export default function ReportModal({ onClose }: ReportModalProps) {
     setSelectedType(type);
     setPeriodOffset(offset);
     setReport(''); // 清空旧报告
+    setStats(null);
+    stopMusic(); // 加载新报告时停止音乐
 
     try {
       const res = await fetch('/api/ai-report', {
@@ -42,13 +104,18 @@ export default function ReportModal({ onClose }: ReportModalProps) {
         setError(data.error);
       } else {
         setReport(data.report);
+        if (data.stats) {
+          setStats(data.stats);
+          // 报告加载成功后播放音乐
+          playMusic(data.stats.avgPerDay);
+        }
       }
     } catch {
       setError('加载报告失败');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [stopMusic, playMusic]);
 
   useEffect(() => {
     loadReport('week', 0);
@@ -115,7 +182,7 @@ export default function ReportModal({ onClose }: ReportModalProps) {
         <div className="p-4 border-b border-white/20 flex justify-between items-center bg-gray-900/80">
           <h2 className="text-xl font-bold text-white">AI 起飞报告</h2>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="text-gray-300 hover:text-white text-2xl leading-none transition-colors btn-press"
           >
             &times;
@@ -212,7 +279,7 @@ export default function ReportModal({ onClose }: ReportModalProps) {
             由 AI 生成，仅供参考
           </p>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-all btn-press"
           >
             关闭
