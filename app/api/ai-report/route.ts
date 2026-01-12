@@ -5,20 +5,27 @@ import { TAKEOFF_REPORT_SYSTEM_PROMPT, generateUserDataPrompt } from '@/lib/ai-p
 
 type ReportType = 'week' | 'month' | 'quarter' | 'year';
 
+const UTC8_OFFSET_MS = 8 * 60 * 60 * 1000;
+
+function getUtc8Date(date = new Date()): Date {
+  const utc8 = new Date(date.getTime() + UTC8_OFFSET_MS);
+  return new Date(Date.UTC(utc8.getUTCFullYear(), utc8.getUTCMonth(), utc8.getUTCDate()));
+}
+
 // 获取周期的开始和结束日期
 function getPeriodDates(type: ReportType, date: Date): { start: string; end: string; label: string; periodKey: string } {
-  const year = date.getFullYear();
-  const month = date.getMonth();
-  const day = date.getDate();
+  const year = date.getUTCFullYear();
+  const month = date.getUTCMonth();
+  const day = date.getUTCDate();
 
   switch (type) {
     case 'week': {
       // 获取本周一和周日
-      const dayOfWeek = date.getDay();
+      const dayOfWeek = date.getUTCDay();
       const monday = new Date(date);
-      monday.setDate(day - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+      monday.setUTCDate(day - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
       const sunday = new Date(monday);
-      sunday.setDate(monday.getDate() + 6);
+      sunday.setUTCDate(monday.getUTCDate() + 6);
 
       const startStr = formatDate(monday);
       const endStr = formatDate(sunday);
@@ -32,8 +39,8 @@ function getPeriodDates(type: ReportType, date: Date): { start: string; end: str
       };
     }
     case 'month': {
-      const firstDay = new Date(year, month, 1);
-      const lastDay = new Date(year, month + 1, 0);
+      const firstDay = new Date(Date.UTC(year, month, 1));
+      const lastDay = new Date(Date.UTC(year, month + 1, 0));
       return {
         start: formatDate(firstDay),
         end: formatDate(lastDay),
@@ -43,8 +50,8 @@ function getPeriodDates(type: ReportType, date: Date): { start: string; end: str
     }
     case 'quarter': {
       const quarter = Math.floor(month / 3);
-      const firstDay = new Date(year, quarter * 3, 1);
-      const lastDay = new Date(year, quarter * 3 + 3, 0);
+      const firstDay = new Date(Date.UTC(year, quarter * 3, 1));
+      const lastDay = new Date(Date.UTC(year, quarter * 3 + 3, 0));
       return {
         start: formatDate(firstDay),
         end: formatDate(lastDay),
@@ -53,9 +60,11 @@ function getPeriodDates(type: ReportType, date: Date): { start: string; end: str
       };
     }
     case 'year': {
+      const firstDay = new Date(Date.UTC(year, 0, 1));
+      const lastDay = new Date(Date.UTC(year, 11, 31));
       return {
-        start: `${year}-01-01`,
-        end: `${year}-12-31`,
+        start: formatDate(firstDay),
+        end: formatDate(lastDay),
         label: `${year}年`,
         periodKey: `${year}`
       };
@@ -70,7 +79,7 @@ function formatDate(date: Date): string {
 // ISO 8601 周数计算：返回 { year, week }
 // 一年的第一周是包含该年第一个周四的那一周
 function getISOWeek(date: Date): { year: number; week: number } {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
   // 设置到本周四（ISO周从周一开始，周四决定周属于哪一年）
   d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
   // 获取该周四所在年份的1月1日
@@ -123,7 +132,7 @@ function calculateStats(data: { date_key: string; status: number }[], startDate:
   }
   periodData.forEach(d => {
     const date = new Date(d.date_key);
-    const dow = date.getDay().toString();
+    const dow = date.getUTCDay().toString();
     if (d.status > 0) {
       dayOfWeekStats[dow].count += d.status;
       dayOfWeekStats[dow].days++;
@@ -152,7 +161,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const today = new Date();
+    const today = getUtc8Date();
     const reportTypes: ReportType[] = ['week', 'month', 'quarter', 'year'];
     const pendingReports: { type: ReportType; periodKey: string; label: string }[] = [];
 
@@ -161,16 +170,16 @@ export async function GET(request: NextRequest) {
       const prevDate = new Date(today);
       switch (type) {
         case 'week':
-          prevDate.setDate(prevDate.getDate() - 7);
+          prevDate.setUTCDate(prevDate.getUTCDate() - 7);
           break;
         case 'month':
-          prevDate.setMonth(prevDate.getMonth() - 1);
+          prevDate.setUTCMonth(prevDate.getUTCMonth() - 1);
           break;
         case 'quarter':
-          prevDate.setMonth(prevDate.getMonth() - 3);
+          prevDate.setUTCMonth(prevDate.getUTCMonth() - 3);
           break;
         case 'year':
-          prevDate.setFullYear(prevDate.getFullYear() - 1);
+          prevDate.setUTCFullYear(prevDate.getUTCFullYear() - 1);
           break;
       }
 
@@ -225,30 +234,30 @@ export async function POST(request: NextRequest) {
     }
 
     // 根据periodOffset获取对应周期（0=当前周期，-1=上一周期）
-    const today = new Date();
+    const today = getUtc8Date();
     const targetDate = new Date(today);
     switch (type) {
       case 'week':
-        targetDate.setDate(targetDate.getDate() + periodOffset * 7);
+        targetDate.setUTCDate(targetDate.getUTCDate() + periodOffset * 7);
         break;
       case 'month':
-        targetDate.setMonth(targetDate.getMonth() + periodOffset);
+        targetDate.setUTCMonth(targetDate.getUTCMonth() + periodOffset);
         break;
       case 'quarter':
-        targetDate.setMonth(targetDate.getMonth() + periodOffset * 3);
+        targetDate.setUTCMonth(targetDate.getUTCMonth() + periodOffset * 3);
         break;
       case 'year':
-        targetDate.setFullYear(targetDate.getFullYear() + periodOffset);
+        targetDate.setUTCFullYear(targetDate.getUTCFullYear() + periodOffset);
         break;
     }
 
     const period = getPeriodDates(type, targetDate);
 
-    // 对于"本周"（periodOffset === 0），使用今天作为结束日期
+    // 对于当前周期（periodOffset === 0），使用今天作为结束日期
     // 即使数据不完整也提交给AI分析
     let actualEndDate = period.end;
     let isPartialPeriod = false;
-    if (type === 'week' && periodOffset === 0) {
+    if (periodOffset === 0) {
       const todayStr = formatDate(today);
       if (todayStr < period.end) {
         actualEndDate = todayStr;
@@ -259,6 +268,8 @@ export async function POST(request: NextRequest) {
     const startDateObj = new Date(period.start);
     const actualEndDateObj = new Date(actualEndDate);
     const actualDataDays = Math.floor((actualEndDateObj.getTime() - startDateObj.getTime()) / 86400000) + 1;
+    const periodEndDateObj = new Date(period.end);
+    const fullPeriodDays = Math.floor((periodEndDateObj.getTime() - startDateObj.getTime()) / 86400000) + 1;
 
     // 获取AI配置
     const { rows: configRows } = await sql`
@@ -281,16 +292,16 @@ export async function POST(request: NextRequest) {
       const prevDate = new Date(targetDate);
       switch (type) {
         case 'week':
-          prevDate.setDate(prevDate.getDate() - i * 7);
+          prevDate.setUTCDate(prevDate.getUTCDate() - i * 7);
           break;
         case 'month':
-          prevDate.setMonth(prevDate.getMonth() - i);
+          prevDate.setUTCMonth(prevDate.getUTCMonth() - i);
           break;
         case 'quarter':
-          prevDate.setMonth(prevDate.getMonth() - i * 3);
+          prevDate.setUTCMonth(prevDate.getUTCMonth() - i * 3);
           break;
         case 'year':
-          prevDate.setFullYear(prevDate.getFullYear() - i);
+          prevDate.setUTCFullYear(prevDate.getUTCFullYear() - i);
           break;
       }
       const prevPeriod = getPeriodDates(type, prevDate);
@@ -344,8 +355,7 @@ export async function POST(request: NextRequest) {
 
     // 生成 UTC+8 时区的 ISO 格式当前时间
     const now = new Date();
-    const utc8Offset = 8 * 60 * 60 * 1000; // UTC+8 偏移量（毫秒）
-    const utc8Time = new Date(now.getTime() + utc8Offset + now.getTimezoneOffset() * 60 * 1000);
+    const utc8Time = new Date(now.getTime() + UTC8_OFFSET_MS + now.getTimezoneOffset() * 60 * 1000);
     const currentIsoTime = utc8Time.toISOString().replace('Z', '+08:00');
 
     // 生成提示词（包含趋势数据和部分周期信息）
@@ -355,7 +365,7 @@ export async function POST(request: NextRequest) {
       stats,
       previousPeriods,
       currentIsoTime,
-      isPartialPeriod ? { actualDataDays, fullPeriodDays: 7 } : undefined
+      isPartialPeriod ? { actualDataDays, fullPeriodDays } : undefined
     );
 
     // 调用AI

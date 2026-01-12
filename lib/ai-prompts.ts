@@ -81,7 +81,7 @@ export function generateUserDataPrompt(
 
   // 部分周期提示
   const partialPeriodNote = partialPeriodInfo
-    ? `\n**注意：本周数据尚不完整，目前只有 ${partialPeriodInfo.actualDataDays} 天的数据（完整周期为 ${partialPeriodInfo.fullPeriodDays} 天）。请基于现有数据进行分析，并提醒用户这是截至目前的统计。**\n`
+    ? `\n**注意：本期数据尚不完整，目前只有 ${partialPeriodInfo.actualDataDays} 天的数据（完整周期为 ${partialPeriodInfo.fullPeriodDays} 天）。请基于现有数据进行分析，并提醒用户这是截至目前的统计。**\n`
     : '';
 
   return `## ${periodNames[periodType]}报告 - ${periodLabel}
