@@ -332,7 +332,7 @@ function HomeContent() {
       });
 
     // 检查 AI 是否已配置（仅登录用户）
-    fetch('/api/ai-report')
+    fetch('/api/ai-report', { cache: 'no-store' })
       .then(res => res.json())
       .then(data => {
         if (data.aiConfigured) {

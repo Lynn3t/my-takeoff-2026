@@ -94,6 +94,7 @@ export default function ReportModal({ onClose }: ReportModalProps) {
     try {
       const res = await fetch('/api/ai-report', {
         method: 'POST',
+        cache: 'no-store',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type, markViewed: false, forceRefresh: true, periodOffset: offset })
       });

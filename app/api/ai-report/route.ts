@@ -3,6 +3,10 @@ import { NextResponse, NextRequest } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { TAKEOFF_REPORT_SYSTEM_PROMPT, generateUserDataPrompt } from '@/lib/ai-prompts';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
+
 type ReportType = 'week' | 'month' | 'quarter' | 'year';
 
 const UTC8_OFFSET_MS = 8 * 60 * 60 * 1000;
@@ -332,9 +336,10 @@ export async function POST(request: NextRequest) {
 
     // 如果没有数据，返回提示
     if (stats.recordedDays === 0) {
+      const partialNote = isPartialPeriod ? `（截至 ${actualEndDate}）` : '';
       const emptyReport = `## ${period.label} 起飞报告
 
-这个周期内暂无记录数据。
+${partialNote}这个周期内暂无记录数据。
 
 开始记录你的起飞日志，才能生成有意义的报告哦！`;
 
