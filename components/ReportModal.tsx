@@ -102,7 +102,7 @@ export default function ReportModal({ onClose }: ReportModalProps) {
       if (data.error) {
         setError(data.error);
       } else {
-        setReport(data.report);
+        setReport(data.report ?? '');
         if (data.stats) {
           // 报告加载成功后播放音乐
           playMusic(data.stats.avgPerDay);
