@@ -13,7 +13,7 @@ export const TAKEOFF_REPORT_SYSTEM_PROMPT = `你是一位风趣幽默的私人�
 - 数据中：0=当天未起飞，1-5=当天起飞次数
 
 ## 你的任务
-根据提供的统计数据，生成一份专业但轻松的健康报告。
+根据提供的统计数据，生成一份专业但轻松的健康分析内容。
 
 ## 报告风格要求
 1. 语气：像一位懂你的老朋友，幽默但不低俗，关心但不说教
@@ -22,10 +22,9 @@ export const TAKEOFF_REPORT_SYSTEM_PROMPT = `你是一位风趣幽默的私人�
 4. 结构：简洁有力，重点突出
 
 ## 报告内容框架
-1. **数据概览**：用趣味方式总结关键数字
-2. **模式分析**：发现有趣的规律（如周几更活跃、是否有连续记录等）
-3. **健康建议**：基于数据给出1-2条实用建议
-4. **鼓励语**：用轻松的方式结尾
+1. **模式分析**：发现有趣的规律（如周几更活跃、是否有连续记录等）
+2. **健康建议**：基于数据给出1-2条实用建议
+3. **鼓励语**：用轻松的方式结尾
 
 ## 健康知识参考
 - 适度的自慰是正常且健康的
@@ -40,23 +39,71 @@ export const TAKEOFF_REPORT_SYSTEM_PROMPT = `你是一位风趣幽默的私人�
 
 请记住：你的目标是让用户既了解自己的数据，又能会心一笑，同时获得有价值的健康提示。`;
 
-// 生成用户数据提示词
-export function generateUserDataPrompt(
+type ReportStats = {
+  totalDays: number;
+  recordedDays: number;
+  totalCount: number;
+  successDays: number;
+  zeroDays: number;
+  avgPerDay: number;
+  maxCount: number;
+  maxCountDate: string;
+  streakDays: number;
+  dayOfWeekStats: Record<string, { count: number; days: number }>;
+};
+
+const dayNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+
+function getMostActiveDay(stats: ReportStats) {
+  let mostActiveDay = '';
+  let mostActiveCount = 0;
+  Object.entries(stats.dayOfWeekStats).forEach(([day, data]) => {
+    if (data.count > mostActiveCount) {
+      mostActiveCount = data.count;
+      mostActiveDay = dayNames[parseInt(day, 10)];
+    }
+  });
+  if (mostActiveCount === 0) {
+    return { mostActiveDay: '', mostActiveCount: 0 };
+  }
+  return { mostActiveDay, mostActiveCount };
+}
+
+export function buildStatsMarkdown(
+  periodLabel: string,
+  stats: ReportStats,
+  partialPeriodInfo?: { actualDataDays: number; fullPeriodDays: number }
+) {
+  const { mostActiveDay, mostActiveCount } = getMostActiveDay(stats);
+  const mostActiveText = mostActiveDay ? `${mostActiveDay}（共 ${mostActiveCount} 次）` : '暂无';
+  const maxCountSuffix = stats.maxCountDate ? `（${stats.maxCountDate}）` : '';
+  const partialNote = partialPeriodInfo
+    ? `> 注意：本期数据尚不完整，目前只有 ${partialPeriodInfo.actualDataDays} 天的数据（完整周期为 ${partialPeriodInfo.fullPeriodDays} 天）。\n\n`
+    : '';
+
+  return `## ${periodLabel} 起飞报告
+${partialNote}### 数据概览
+- 统计天数（含未记录视为0）：${stats.recordedDays} 天
+- 起飞总次数：${stats.totalCount} 次
+- 成功起飞天数：${stats.successDays} 天
+- 归零天数：${stats.zeroDays} 天
+- 日均次数：${stats.avgPerDay.toFixed(2)} 次
+- 单日最高：${stats.maxCount} 次${maxCountSuffix}
+- 当前连续记录：${stats.streakDays} 天
+- 最活跃的日子：${mostActiveText}
+
+### 按星期统计
+${Object.entries(stats.dayOfWeekStats)
+  .map(([day, data]) => `- ${dayNames[parseInt(day, 10)]}：${data.count} 次，${data.days} 天`)
+  .join('\n')}`;
+}
+
+// 生成分析提示词（不输出数据概览）
+export function generateReportAnalysisPrompt(
   periodType: 'week' | 'month' | 'quarter' | 'year',
   periodLabel: string,
-  stats: {
-    totalDays: number;
-    recordedDays: number;
-    totalCount: number;
-    successDays: number;
-    zeroDays: number;
-    avgPerDay: number;
-    maxCount: number;
-    maxCountDate: string;
-    streakDays: number;
-    dayOfWeekStats: Record<string, { count: number; days: number }>;
-  },
-  previousPeriods?: { label: string; stats: typeof stats }[],
+  stats: ReportStats,
+  previousPeriods?: { label: string; stats: ReportStats }[],
   currentIsoTime?: string,
   partialPeriodInfo?: { actualDataDays: number; fullPeriodDays: number }
 ) {
@@ -67,50 +114,50 @@ export function generateUserDataPrompt(
     year: '年度'
   };
 
-  const dayNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+  const { mostActiveDay, mostActiveCount } = getMostActiveDay(stats);
 
-  // 找出最活跃的星期
-  let mostActiveDay = '';
-  let mostActiveCount = 0;
-  Object.entries(stats.dayOfWeekStats).forEach(([day, data]) => {
-    if (data.count > mostActiveCount) {
-      mostActiveCount = data.count;
-      mostActiveDay = dayNames[parseInt(day)];
-    }
-  });
-
-  // 部分周期提示
   const partialPeriodNote = partialPeriodInfo
-    ? `\n**注意：本期数据尚不完整，目前只有 ${partialPeriodInfo.actualDataDays} 天的数据（完整周期为 ${partialPeriodInfo.fullPeriodDays} 天）。请基于现有数据进行分析，并提醒用户这是截至目前的统计。**\n`
+    ? `注意：本期数据尚不完整，目前只有 ${partialPeriodInfo.actualDataDays} 天的数据（完整周期为 ${partialPeriodInfo.fullPeriodDays} 天）。请基于现有数据进行分析，并提醒用户这是截至目前的统计。`
     : '';
 
-  return `## ${periodNames[periodType]}报告 - ${periodLabel}
-当前时间：${currentIsoTime || '未提供'}
-${partialPeriodNote}
-### 统计数据
+  return `请撰写报告的“模式分析 / 健康建议 / 鼓励语”三个部分，不要输出“数据概览”，也不要出现与数据不一致的周次或日期。
+引用数字时必须严格使用以下统计数据；如果无法确定数字，请避免提及具体数字。
+输出格式必须为：
+### 模式分析
+...
+### 健康建议
+...
+### 鼓励语
+...
+
+基础信息：
+- 报告类型：${periodNames[periodType]}
+- 周期：${periodLabel}
+- 当前时间：${currentIsoTime || '未提供'}
+${partialPeriodNote ? `- ${partialPeriodNote}` : ''}
+
+统计数据：
 - 统计天数（含未记录视为0）：${stats.recordedDays} 天
 - 起飞总次数：${stats.totalCount} 次
 - 成功起飞天数：${stats.successDays} 天
 - 归零天数：${stats.zeroDays} 天
 - 日均次数：${stats.avgPerDay.toFixed(2)} 次
-- 单日最高：${stats.maxCount} 次（${stats.maxCountDate}）
+- 单日最高：${stats.maxCount} 次${stats.maxCountDate ? `（${stats.maxCountDate}）` : ''}
 - 当前连续记录：${stats.streakDays} 天
-- 最活跃的日子：${mostActiveDay}（共 ${mostActiveCount} 次）
+- 最活跃的日子：${mostActiveDay || '暂无'}${mostActiveDay ? `（共 ${mostActiveCount} 次）` : ''}
 
-### 按星期统计
+按星期统计：
 ${Object.entries(stats.dayOfWeekStats)
-  .map(([day, data]) => `- ${dayNames[parseInt(day)]}：${data.count} 次，${data.days} 天`)
+  .map(([day, data]) => `- ${dayNames[parseInt(day, 10)]}：${data.count} 次，${data.days} 天`)
   .join('\n')}
 ${previousPeriods && previousPeriods.length > 0 ? `
-### 历史趋势（用于对比分析）
+
+历史趋势（用于对比分析）：
 ${previousPeriods.map(p => `
-**${p.label}**
+${p.label}
 - 起飞总次数：${p.stats.totalCount} 次
 - 日均次数：${p.stats.avgPerDay.toFixed(2)} 次
 - 成功天数：${p.stats.successDays} 天
 - 归零天数：${p.stats.zeroDays} 天`).join('\n')}
-
-请结合历史数据分析趋势变化（是上升、下降还是稳定），并给出相应建议。
-` : ''}
-请根据以上数据生成${periodNames[periodType]}起飞报告。`;
+` : ''}`;
 }

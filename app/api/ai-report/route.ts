@@ -1,7 +1,7 @@
 import { sql } from '@vercel/postgres';
 import { NextResponse, NextRequest } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
-import { TAKEOFF_REPORT_SYSTEM_PROMPT, generateUserDataPrompt } from '@/lib/ai-prompts';
+import { TAKEOFF_REPORT_SYSTEM_PROMPT, buildStatsMarkdown, generateReportAnalysisPrompt } from '@/lib/ai-prompts';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -394,7 +394,7 @@ ${partialNote}这个周期内暂无记录数据。
     const currentIsoTime = utc8Time.toISOString().replace('Z', '+08:00');
 
     // 生成提示词（包含趋势数据和部分周期信息）
-    const userPrompt = generateUserDataPrompt(
+    const userPrompt = generateReportAnalysisPrompt(
       type,
       period.label,
       stats,
@@ -432,7 +432,13 @@ ${partialNote}这个周期内暂无记录数据。
     }
 
     const aiData = await aiResponse.json();
-    const report = aiData.choices?.[0]?.message?.content || '报告生成失败';
+    const analysis = aiData.choices?.[0]?.message?.content?.trim();
+    const statsMarkdown = buildStatsMarkdown(
+      period.label,
+      stats,
+      isPartialPeriod ? { actualDataDays, fullPeriodDays } : undefined
+    );
+    const report = analysis ? `${statsMarkdown}\n\n${analysis}` : statsMarkdown;
 
     // 标记为已查看
     if (markViewed) {
