@@ -6,6 +6,7 @@ type ReportType = 'week' | 'month' | 'quarter' | 'year';
 
 interface ReportModalProps {
   onClose: () => void;
+  refreshKey: number;
 }
 
 interface ReportStats {
@@ -33,13 +34,15 @@ function getMusicConfig(avgPerDay: number): { file: string; startTime: number } 
   }
 }
 
-export default function ReportModal({ onClose }: ReportModalProps) {
+export default function ReportModal({ onClose, refreshKey }: ReportModalProps) {
   const [selectedType, setSelectedType] = useState<ReportType>('week');
   const [periodOffset, setPeriodOffset] = useState(0); // 0=当前周期，-1=上一周期
   const [report, setReport] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const selectedTypeRef = useRef<ReportType>('week');
+  const periodOffsetRef = useRef(0);
 
   // 播放音乐
   const playMusic = useCallback((avgPerDay: number) => {
@@ -81,11 +84,13 @@ export default function ReportModal({ onClose }: ReportModalProps) {
     onClose();
   }, [stopMusic, onClose]);
 
-  const loadReport = useCallback(async (type: ReportType, offset: number = 0) => {
+  const loadReport = useCallback(async (type: ReportType, offset: number = 0, updateSelection: boolean = true) => {
     setLoading(true);
     setError('');
-    setSelectedType(type);
-    setPeriodOffset(offset);
+    if (updateSelection) {
+      setSelectedType(type);
+      setPeriodOffset(offset);
+    }
     setReport(''); // 清空旧报告
     stopMusic(); // 加载新报告时停止音乐
 
@@ -116,8 +121,13 @@ export default function ReportModal({ onClose }: ReportModalProps) {
   }, [stopMusic, playMusic]);
 
   useEffect(() => {
-    loadReport('week', 0);
-  }, [loadReport]);
+    selectedTypeRef.current = selectedType;
+    periodOffsetRef.current = periodOffset;
+  }, [selectedType, periodOffset]);
+
+  useEffect(() => {
+    loadReport(selectedTypeRef.current, periodOffsetRef.current, false);
+  }, [refreshKey, loadReport]);
 
   // 简单的 Markdown 渲染（支持基本语法）
   function renderMarkdown(text: string) {

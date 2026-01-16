@@ -128,6 +128,8 @@ function calculateStats(data: { date_key: string; status: number }[], startDate:
   let totalCount = 0;
   let maxCount = 0;
   let maxCountDate = '';
+  let maxStreak = 0;
+  let currentStreak = 0;
 
   // 按星期统计
   const dayOfWeekStats: Record<string, { count: number; days: number }> = {};
@@ -149,24 +151,18 @@ function calculateStats(data: { date_key: string; status: number }[], startDate:
         maxCount = status;
         maxCountDate = dateKey;
       }
+      currentStreak++;
+      if (currentStreak > maxStreak) {
+        maxStreak = currentStreak;
+      }
     } else {
       zeroDays++;
+      currentStreak = 0;
     }
   }
 
   const avgPerDay = recordedDays > 0 ? totalCount / recordedDays : 0;
-
-  // 计算连续记录天数
-  let streakDays = 0;
-  for (let cursor = new Date(end); cursor >= start; cursor.setUTCDate(cursor.getUTCDate() - 1)) {
-    const dateKey = formatDate(cursor);
-    const status = dataMap.get(dateKey) ?? 0;
-    if (status > 0) {
-      streakDays++;
-    } else {
-      break;
-    }
-  }
+  const streakDays = maxStreak;
 
   return {
     totalDays,

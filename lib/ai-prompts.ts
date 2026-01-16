@@ -92,10 +92,7 @@ ${partialNote}### 数据概览
 - 当前连续记录：${stats.streakDays} 天
 - 最活跃的日子：${mostActiveText}
 
-### 按星期统计
-${Object.entries(stats.dayOfWeekStats)
-  .map(([day, data]) => `- ${dayNames[parseInt(day, 10)]}：${data.count} 次，${data.days} 天`)
-  .join('\n')}`;
+`;
 }
 
 // 生成分析提示词（不输出数据概览）
@@ -146,10 +143,6 @@ ${partialPeriodNote ? `- ${partialPeriodNote}` : ''}
 - 当前连续记录：${stats.streakDays} 天
 - 最活跃的日子：${mostActiveDay || '暂无'}${mostActiveDay ? `（共 ${mostActiveCount} 次）` : ''}
 
-按星期统计：
-${Object.entries(stats.dayOfWeekStats)
-  .map(([day, data]) => `- ${dayNames[parseInt(day, 10)]}：${data.count} 次，${data.days} 天`)
-  .join('\n')}
 ${previousPeriods && previousPeriods.length > 0 ? `
 
 历史趋势（用于对比分析）：

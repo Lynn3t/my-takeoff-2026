@@ -221,6 +221,7 @@ function HomeContent() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null); // null=未知, true=已登录, false=未登录
   const [showReportModal, setShowReportModal] = useState(false);
+  const [reportRefreshKey, setReportRefreshKey] = useState(0);
   const [aiConfigured, setAiConfigured] = useState(false);
   const [isOnline, setIsOnline] = useState(() => (typeof navigator !== 'undefined' ? navigator.onLine : true));
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
@@ -645,7 +646,10 @@ function HomeContent() {
         {/* AI 报告按钮 */}
         {aiConfigured && (
           <button
-              onClick={() => setShowReportModal(true)}
+              onClick={() => {
+                setReportRefreshKey(prev => prev + 1);
+                setShowReportModal(true);
+              }}
               className="px-4 py-1.5 bg-gray-900 hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100 text-white text-xs rounded-full transition-all font-medium flex items-center gap-1 btn-press"
           >
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
@@ -665,6 +669,7 @@ function HomeContent() {
       {/* AI 报告弹窗 */}
       {showReportModal && (
         <ReportModal
+          refreshKey={reportRefreshKey}
           onClose={() => setShowReportModal(false)}
         />
       )}
