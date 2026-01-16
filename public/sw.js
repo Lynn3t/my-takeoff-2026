@@ -1,6 +1,5 @@
 // sw.js - Service Worker with Offline Sync Support
 
-const CACHE_NAME = 'takeoff-v1';
 const DB_NAME = 'TakeoffOfflineDB';
 const STORE_NAME = 'pendingRequests';
 
@@ -50,17 +49,6 @@ async function deletePendingRequest(id) {
     const tx = db.transaction(STORE_NAME, 'readwrite');
     const store = tx.objectStore(STORE_NAME);
     const request = store.delete(id);
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-  });
-}
-
-async function clearAllPendingRequests() {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    const store = tx.objectStore(STORE_NAME);
-    const request = store.clear();
     request.onsuccess = () => resolve();
     request.onerror = () => reject(request.error);
   });
@@ -124,7 +112,7 @@ async function syncPendingRequests() {
 }
 
 // Install 事件
-self.addEventListener('install', (event) => {
+self.addEventListener('install', () => {
   console.log('[SW] Installing...');
   self.skipWaiting();
 });
@@ -155,7 +143,7 @@ async function handleApiPost(request) {
     // 尝试在线请求
     const response = await fetch(request.clone());
     return response;
-  } catch (error) {
+  } catch {
     // 离线状态 - 保存请求到 IndexedDB
     console.log('[SW] Offline - saving request for later sync');
 

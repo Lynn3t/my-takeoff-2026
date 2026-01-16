@@ -80,6 +80,24 @@ function formatDate(date: Date): string {
   return date.toISOString().split('T')[0];
 }
 
+function buildChatCompletionsEndpoint(endpoint: string): string {
+  try {
+    const url = new URL(endpoint);
+    const pathname = url.pathname.replace(/\/+$/, '');
+    if (pathname.endsWith('/chat/completions')) {
+      url.pathname = pathname;
+      return url.toString();
+    }
+    url.pathname = `${pathname}/chat/completions`;
+    return url.toString();
+  } catch {
+    const [base, query] = endpoint.split('?', 2);
+    const trimmed = base.replace(/\/+$/, '');
+    const full = trimmed.endsWith('/chat/completions') ? trimmed : `${trimmed}/chat/completions`;
+    return query ? `${full}?${query}` : full;
+  }
+}
+
 // ISO 8601 周数计算：返回 { year, week }
 // 一年的第一周是包含该年第一个周四的那一周
 function getISOWeek(date: Date): { year: number; week: number } {
@@ -95,53 +113,60 @@ function getISOWeek(date: Date): { year: number; week: number } {
 
 // 计算统计数据
 function calculateStats(data: { date_key: string; status: number }[], startDate: string, endDate: string) {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+  const start = new Date(`${startDate}T00:00:00Z`);
+  const end = new Date(`${endDate}T00:00:00Z`);
   const totalDays = Math.floor((end.getTime() - start.getTime()) / 86400000) + 1;
 
-  // 过滤周期内的数据
+  // 过滤周期内的数据，缺失日期视为 0 次
   const periodData = data.filter(d => d.date_key >= startDate && d.date_key <= endDate);
+  const dataMap = new Map<string, number>();
+  periodData.forEach(d => dataMap.set(d.date_key, d.status));
 
-  const recordedDays = periodData.length;
-  const successDays = periodData.filter(d => d.status > 0).length;
-  const zeroDays = periodData.filter(d => d.status === 0).length;
-  const totalCount = periodData.reduce((sum, d) => sum + (d.status > 0 ? d.status : 0), 0);
-  const avgPerDay = recordedDays > 0 ? totalCount / recordedDays : 0;
-
-  // 找最高记录
+  const recordedDays = totalDays;
+  let successDays = 0;
+  let zeroDays = 0;
+  let totalCount = 0;
   let maxCount = 0;
   let maxCountDate = '';
-  periodData.forEach(d => {
-    if (d.status > maxCount) {
-      maxCount = d.status;
-      maxCountDate = d.date_key;
-    }
-  });
-
-  // 计算连续记录天数
-  let streakDays = 0;
-  const sortedData = [...periodData].sort((a, b) => b.date_key.localeCompare(a.date_key));
-  for (const d of sortedData) {
-    if (d.status > 0) {
-      streakDays++;
-    } else {
-      break;
-    }
-  }
 
   // 按星期统计
   const dayOfWeekStats: Record<string, { count: number; days: number }> = {};
   for (let i = 0; i < 7; i++) {
     dayOfWeekStats[i.toString()] = { count: 0, days: 0 };
   }
-  periodData.forEach(d => {
-    const date = new Date(d.date_key);
-    const dow = date.getUTCDay().toString();
-    if (d.status > 0) {
-      dayOfWeekStats[dow].count += d.status;
-      dayOfWeekStats[dow].days++;
+
+  for (let cursor = new Date(start); cursor <= end; cursor.setUTCDate(cursor.getUTCDate() + 1)) {
+    const dateKey = formatDate(cursor);
+    const status = dataMap.get(dateKey) ?? 0;
+    const dow = cursor.getUTCDay().toString();
+    dayOfWeekStats[dow].days += 1;
+
+    if (status > 0) {
+      successDays++;
+      totalCount += status;
+      dayOfWeekStats[dow].count += status;
+      if (status > maxCount) {
+        maxCount = status;
+        maxCountDate = dateKey;
+      }
+    } else {
+      zeroDays++;
     }
-  });
+  }
+
+  const avgPerDay = recordedDays > 0 ? totalCount / recordedDays : 0;
+
+  // 计算连续记录天数
+  let streakDays = 0;
+  for (let cursor = new Date(end); cursor >= start; cursor.setUTCDate(cursor.getUTCDate() - 1)) {
+    const dateKey = formatDate(cursor);
+    const status = dataMap.get(dateKey) ?? 0;
+    if (status > 0) {
+      streakDays++;
+    } else {
+      break;
+    }
+  }
 
   return {
     totalDays,
@@ -208,9 +233,14 @@ export async function GET(request: NextRequest) {
 
     // 检查AI是否已配置
     const { rows: configRows } = await sql`
-      SELECT config_value FROM ai_config WHERE config_key = 'ai_endpoint'
+      SELECT config_key, config_value FROM ai_config
+      WHERE config_key IN ('ai_endpoint', 'ai_api_key')
     `;
-    const aiConfigured = configRows.length > 0 && configRows[0].config_value;
+    const config: Record<string, string> = {};
+    configRows.forEach(row => {
+      config[row.config_key] = row.config_value;
+    });
+    const aiConfigured = !!(config['ai_endpoint'] && config['ai_api_key']);
 
     return NextResponse.json({
       pendingReports,
@@ -335,7 +365,7 @@ export async function POST(request: NextRequest) {
     const stats = calculateStats(dataRows as { date_key: string; status: number }[], period.start, actualEndDate);
 
     // 如果没有数据，返回提示
-    if (stats.recordedDays === 0) {
+    if (dataRows.length === 0) {
       const partialNote = isPartialPeriod ? `（截至 ${actualEndDate}）` : '';
       const emptyReport = `## ${period.label} 起飞报告
 
@@ -374,11 +404,7 @@ ${partialNote}这个周期内暂无记录数据。
     );
 
     // 调用AI
-    // 自动补全 chat/completions 路径
-    let endpoint = config['ai_endpoint'];
-    if (!endpoint.endsWith('/chat/completions')) {
-      endpoint = endpoint.replace(/\/?$/, '/chat/completions');
-    }
+    const endpoint = buildChatCompletionsEndpoint(config['ai_endpoint']);
 
     const aiResponse = await fetch(endpoint, {
       method: 'POST',

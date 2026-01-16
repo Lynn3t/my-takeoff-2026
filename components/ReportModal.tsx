@@ -39,7 +39,6 @@ export default function ReportModal({ onClose }: ReportModalProps) {
   const [report, setReport] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [stats, setStats] = useState<ReportStats | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // 播放音乐
@@ -88,7 +87,6 @@ export default function ReportModal({ onClose }: ReportModalProps) {
     setSelectedType(type);
     setPeriodOffset(offset);
     setReport(''); // 清空旧报告
-    setStats(null);
     stopMusic(); // 加载新报告时停止音乐
 
     try {
@@ -96,17 +94,16 @@ export default function ReportModal({ onClose }: ReportModalProps) {
         method: 'POST',
         cache: 'no-store',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, markViewed: false, forceRefresh: true, periodOffset: offset })
+        body: JSON.stringify({ type, markViewed: true, forceRefresh: true, periodOffset: offset })
       });
 
-      const data = await res.json();
+      const data = (await res.json()) as { report?: string; stats?: ReportStats; error?: string };
 
       if (data.error) {
         setError(data.error);
       } else {
         setReport(data.report);
         if (data.stats) {
-          setStats(data.stats);
           // 报告加载成功后播放音乐
           playMusic(data.stats.avgPerDay);
         }

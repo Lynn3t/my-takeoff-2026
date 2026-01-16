@@ -88,8 +88,7 @@ export function generateUserDataPrompt(
 当前时间：${currentIsoTime || '未提供'}
 ${partialPeriodNote}
 ### 统计数据
-- 统计周期天数：${stats.totalDays} 天
-- 有记录天数：${stats.recordedDays} 天
+- 统计天数（含未记录视为0）：${stats.recordedDays} 天
 - 起飞总次数：${stats.totalCount} 次
 - 成功起飞天数：${stats.successDays} 天
 - 归零天数：${stats.zeroDays} 天
@@ -100,7 +99,7 @@ ${partialPeriodNote}
 
 ### 按星期统计
 ${Object.entries(stats.dayOfWeekStats)
-  .map(([day, data]) => `- ${dayNames[parseInt(day)]}：${data.count} 次，${data.days} 天有记录`)
+  .map(([day, data]) => `- ${dayNames[parseInt(day)]}：${data.count} 次，${data.days} 天`)
   .join('\n')}
 ${previousPeriods && previousPeriods.length > 0 ? `
 ### 历史趋势（用于对比分析）

@@ -60,7 +60,7 @@ export async function GET() {
       report_viewed: tables.includes('report_viewed'),
       message: tables.length === 2 ? '所有表已存在' : '需要创建表'
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: '检查失败' }, { status: 500 });
   }
 }

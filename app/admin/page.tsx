@@ -412,7 +412,7 @@ export default function AdminPage() {
                 required
               />
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                支持 OpenAI、Azure、或其他兼容端点
+                支持 OpenAI 或其他兼容端点
               </p>
             </div>
             <div>

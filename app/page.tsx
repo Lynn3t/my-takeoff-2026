@@ -92,37 +92,34 @@ const UserBarSkeleton = memo(function UserBarSkeleton() {
 type InstallPromptType = 'none' | 'android' | 'ios';
 
 const InstallPrompt = memo(function InstallPrompt() {
-  const [promptType, setPromptType] = useState<InstallPromptType>('none');
-
-  useEffect(() => {
-    // 检测设备和环境
+  const [promptType] = useState<InstallPromptType>(() => {
+    if (typeof window === 'undefined') return 'none';
     const ua = navigator.userAgent.toLowerCase();
     const isAndroid = /android/.test(ua);
     const isIOS = /iphone|ipad|ipod/.test(ua);
     const isMobile = isAndroid || isIOS;
 
     // 检测是否在 standalone 模式（PWA/TWA/已安装的 APK）
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+    const isStandalone = (window.matchMedia?.('(display-mode: standalone)').matches ?? false)
       || (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
 
     // 电脑或已安装的应用：不显示
     if (!isMobile || isStandalone) {
-      setPromptType('none');
-      return;
+      return 'none';
     }
 
     // 安卓浏览器：显示下载 APK
     if (isAndroid) {
-      setPromptType('android');
-      return;
+      return 'android';
     }
 
     // iOS 浏览器：显示添加到主屏幕
     if (isIOS) {
-      setPromptType('ios');
-      return;
+      return 'ios';
     }
-  }, []);
+
+    return 'none';
+  });
 
   if (promptType === 'none') return null;
 
@@ -225,23 +222,16 @@ function HomeContent() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null); // null=未知, true=已登录, false=未登录
   const [showReportModal, setShowReportModal] = useState(false);
   const [aiConfigured, setAiConfigured] = useState(false);
-  const [isOnline, setIsOnline] = useState(true);
+  const [isOnline, setIsOnline] = useState(() => (typeof navigator !== 'undefined' ? navigator.onLine : true));
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [todayKey, setTodayKey] = useState<string>('');
-  const year = 2026;
-
-  const getTodayString = () => {
+  const [todayKey] = useState<string>(() => {
     const d = new Date();
     const offset = d.getTimezoneOffset() * 60000;
     const local = new Date(d.getTime() - offset);
     return local.toISOString().split('T')[0];
-  };
-
-  // 在客户端设置今日日期，避免 hydration 不匹配
-  useEffect(() => {
-    setTodayKey(getTodayString());
-  }, []);
+  });
+  const year = 2026;
 
   useEffect(() => {
     // 获取当前用户信息
@@ -332,12 +322,13 @@ function HomeContent() {
       });
 
     // 检查 AI 是否已配置（仅登录用户）
-    fetch('/api/ai-report', { cache: 'no-store' })
+    fetch('/api/ai-config', { cache: 'no-store' })
       .then(res => res.json())
       .then(data => {
-        if (data.aiConfigured) {
-          setAiConfigured(true);
-        }
+        const configured = typeof data.configured === 'boolean'
+          ? data.configured
+          : Boolean(data.config?.ai_endpoint && data.config?.has_api_key);
+        setAiConfigured(!!configured);
       })
       .catch(() => {
         // 忽略错误（可能是表还未创建或未登录）
@@ -346,9 +337,6 @@ function HomeContent() {
 
   // 离线状态管理
   useEffect(() => {
-    // 初始化在线状态
-    setIsOnline(navigator.onLine);
-
     const handleOnline = () => {
       setIsOnline(true);
       // 在线后请求同步

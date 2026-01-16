@@ -1,6 +1,6 @@
 import { sql } from '@vercel/postgres';
 import { NextResponse } from 'next/server';
-import { hashPassword, verifyPassword, generateSessionToken, generatePassword, getCurrentUser } from '@/lib/auth';
+import { verifyPassword, generateSessionToken, getCurrentUser } from '@/lib/auth';
 
 // 登录
 export async function POST(request: Request) {
