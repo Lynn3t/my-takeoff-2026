@@ -257,7 +257,12 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { type, markViewed, periodOffset = 0 } = body as { type: ReportType; markViewed?: boolean; periodOffset?: number };
+    const { type, markViewed, periodOffset = 0, forceRefresh } = body as {
+      type: ReportType;
+      markViewed?: boolean;
+      periodOffset?: number;
+      forceRefresh?: boolean;
+    };
 
     if (!['week', 'month', 'quarter', 'year'].includes(type)) {
       return NextResponse.json({ error: '无效的报告类型' }, { status: 400 });
@@ -390,13 +395,15 @@ ${partialNote}这个周期内暂无记录数据。
     const currentIsoTime = utc8Time.toISOString().replace('Z', '+08:00');
 
     // 生成提示词（包含趋势数据和部分周期信息）
+    const refreshToken = forceRefresh ? `${Date.now()}-${Math.random().toString(36).slice(2, 8)}` : undefined;
     const userPrompt = generateReportAnalysisPrompt(
       type,
       period.label,
       stats,
       previousPeriods,
       currentIsoTime,
-      isPartialPeriod ? { actualDataDays, fullPeriodDays } : undefined
+      isPartialPeriod ? { actualDataDays, fullPeriodDays } : undefined,
+      refreshToken
     );
 
     // 调用AI
@@ -404,6 +411,7 @@ ${partialNote}这个周期内暂无记录数据。
 
     const aiResponse = await fetch(endpoint, {
       method: 'POST',
+      cache: 'no-store',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${config['ai_api_key']}`

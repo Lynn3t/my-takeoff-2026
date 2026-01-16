@@ -89,7 +89,7 @@ ${partialNote}### 数据概览
 - 归零天数：${stats.zeroDays} 天
 - 日均次数：${stats.avgPerDay.toFixed(2)} 次
 - 单日最高：${stats.maxCount} 次${maxCountSuffix}
-- 当前连续记录：${stats.streakDays} 天
+- 最长连续记录：${stats.streakDays} 天
 - 最活跃的日子：${mostActiveText}
 
 `;
@@ -102,7 +102,8 @@ export function generateReportAnalysisPrompt(
   stats: ReportStats,
   previousPeriods?: { label: string; stats: ReportStats }[],
   currentIsoTime?: string,
-  partialPeriodInfo?: { actualDataDays: number; fullPeriodDays: number }
+  partialPeriodInfo?: { actualDataDays: number; fullPeriodDays: number },
+  refreshToken?: string
 ) {
   const periodNames = {
     week: '周度',
@@ -132,6 +133,7 @@ export function generateReportAnalysisPrompt(
 - 周期：${periodLabel}
 - 当前时间：${currentIsoTime || '未提供'}
 ${partialPeriodNote ? `- ${partialPeriodNote}` : ''}
+${refreshToken ? `- 刷新标识：${refreshToken}（不要在输出中提及）` : ''}
 
 统计数据：
 - 统计天数（含未记录视为0）：${stats.recordedDays} 天
@@ -140,7 +142,7 @@ ${partialPeriodNote ? `- ${partialPeriodNote}` : ''}
 - 归零天数：${stats.zeroDays} 天
 - 日均次数：${stats.avgPerDay.toFixed(2)} 次
 - 单日最高：${stats.maxCount} 次${stats.maxCountDate ? `（${stats.maxCountDate}）` : ''}
-- 当前连续记录：${stats.streakDays} 天
+- 最长连续记录：${stats.streakDays} 天
 - 最活跃的日子：${mostActiveDay || '暂无'}${mostActiveDay ? `（共 ${mostActiveCount} 次）` : ''}
 
 ${previousPeriods && previousPeriods.length > 0 ? `
