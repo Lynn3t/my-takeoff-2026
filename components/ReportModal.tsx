@@ -43,6 +43,8 @@ export default function ReportModal({ onClose, refreshKey }: ReportModalProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const selectedTypeRef = useRef<ReportType>('week');
   const periodOffsetRef = useRef(0);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const requestIdRef = useRef(0);
 
   // 播放音乐
   const playMusic = useCallback((avgPerDay: number) => {
@@ -85,11 +87,22 @@ export default function ReportModal({ onClose, refreshKey }: ReportModalProps) {
   }, [stopMusic, onClose]);
 
   const loadReport = useCallback(async (type: ReportType, offset: number = 0, updateSelection: boolean = true) => {
+    const requestId = ++requestIdRef.current;
+
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    const timeoutId = window.setTimeout(() => controller.abort(), 45000);
+
     setLoading(true);
     setError('');
     if (updateSelection) {
       setSelectedType(type);
       setPeriodOffset(offset);
+      selectedTypeRef.current = type;
+      periodOffsetRef.current = offset;
     }
     setReport(''); // 清空旧报告
     stopMusic(); // 加载新报告时停止音乐
@@ -99,10 +112,27 @@ export default function ReportModal({ onClose, refreshKey }: ReportModalProps) {
         method: 'POST',
         cache: 'no-store',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, markViewed: true, forceRefresh: true, periodOffset: offset })
+        body: JSON.stringify({ type, markViewed: true, forceRefresh: true, periodOffset: offset }),
+        signal: controller.signal
       });
 
+      if (requestId !== requestIdRef.current) return;
+
+      if (!res.ok) {
+        let message = `AI 请求失败（${res.status}）`;
+        try {
+          const errJson = await res.json();
+          if (errJson?.error) message = errJson.error;
+        } catch {
+          const text = await res.text();
+          if (text) message = text.slice(0, 200);
+        }
+        setError(message);
+        return;
+      }
+
       const data = (await res.json()) as { report?: string; stats?: ReportStats; error?: string };
+      if (requestId !== requestIdRef.current) return;
 
       if (data.error) {
         setError(data.error);
@@ -113,10 +143,17 @@ export default function ReportModal({ onClose, refreshKey }: ReportModalProps) {
           playMusic(data.stats.avgPerDay);
         }
       }
-    } catch {
+    } catch (err) {
+      if ((err as DOMException)?.name === 'AbortError') {
+        return;
+      }
+      if (requestId !== requestIdRef.current) return;
       setError('加载报告失败');
     } finally {
-      setLoading(false);
+      window.clearTimeout(timeoutId);
+      if (requestId === requestIdRef.current) {
+        setLoading(false);
+      }
     }
   }, [stopMusic, playMusic]);
 
@@ -129,6 +166,12 @@ export default function ReportModal({ onClose, refreshKey }: ReportModalProps) {
     loadReport(selectedTypeRef.current, periodOffsetRef.current, false);
   }, [refreshKey, loadReport]);
 
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
+
   // 简单的 Markdown 渲染（支持基本语法）
   function renderMarkdown(text: string) {
     if (!text) return null;
@@ -136,29 +179,44 @@ export default function ReportModal({ onClose, refreshKey }: ReportModalProps) {
     const lines = text.split('\n');
     const elements: ReactElement[] = [];
     let key = 0;
+    let listBuffer: ReactElement[] = [];
+
+    const flushList = () => {
+      if (listBuffer.length === 0) return;
+      elements.push(
+        <ul key={`list-${key++}`} className="list-disc list-inside text-gray-300 space-y-1 ml-1">
+          {listBuffer}
+        </ul>
+      );
+      listBuffer = [];
+    };
 
     for (const line of lines) {
       if (line.startsWith('## ')) {
+        flushList();
         elements.push(
           <h2 key={key++} className="text-xl font-bold mt-4 mb-2 text-white">
             {line.slice(3)}
           </h2>
         );
       } else if (line.startsWith('### ')) {
+        flushList();
         elements.push(
           <h3 key={key++} className="text-lg font-semibold mt-3 mb-1 text-gray-200">
             {line.slice(4)}
           </h3>
         );
       } else if (line.startsWith('- ')) {
-        elements.push(
+        listBuffer.push(
           <li key={key++} className="ml-4 text-gray-300">
             {renderInline(line.slice(2))}
           </li>
         );
       } else if (line.trim() === '') {
+        flushList();
         elements.push(<br key={key++} />);
       } else {
+        flushList();
         elements.push(
           <p key={key++} className="text-gray-300 my-1">
             {renderInline(line)}
@@ -167,6 +225,7 @@ export default function ReportModal({ onClose, refreshKey }: ReportModalProps) {
       }
     }
 
+    flushList();
     return elements;
   }
 

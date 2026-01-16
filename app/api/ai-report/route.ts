@@ -409,23 +409,38 @@ ${partialNote}这个周期内暂无记录数据。
     // 调用AI
     const endpoint = buildChatCompletionsEndpoint(config['ai_endpoint']);
 
-    const aiResponse = await fetch(endpoint, {
-      method: 'POST',
-      cache: 'no-store',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config['ai_api_key']}`
-      },
-      body: JSON.stringify({
-        model: config['ai_model'] || 'gpt-3.5-turbo',
-        messages: [
-          { role: 'system', content: TAKEOFF_REPORT_SYSTEM_PROMPT },
-          { role: 'user', content: userPrompt }
-        ],
-        temperature: 0.7,
-        max_tokens: 1000
-      })
-    });
+    const aiController = new AbortController();
+    const aiTimeout = setTimeout(() => aiController.abort(), 45000);
+
+    let aiResponse: Response;
+    try {
+      aiResponse = await fetch(endpoint, {
+        method: 'POST',
+        cache: 'no-store',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${config['ai_api_key']}`
+        },
+        body: JSON.stringify({
+          model: config['ai_model'] || 'gpt-3.5-turbo',
+          messages: [
+            { role: 'system', content: TAKEOFF_REPORT_SYSTEM_PROMPT },
+            { role: 'user', content: userPrompt }
+          ],
+          temperature: 0.7,
+          max_tokens: 1000
+        }),
+        signal: aiController.signal
+      });
+    } catch (error) {
+      clearTimeout(aiTimeout);
+      if ((error as DOMException)?.name === 'AbortError') {
+        return NextResponse.json({ error: 'AI 响应超时，请稍后重试' }, { status: 504 });
+      }
+      throw error;
+    } finally {
+      clearTimeout(aiTimeout);
+    }
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
@@ -435,7 +450,13 @@ ${partialNote}这个周期内暂无记录数据。
       }, { status: 500 });
     }
 
-    const aiData = await aiResponse.json();
+    let aiData: { choices?: { message?: { content?: string } }[] } | null = null;
+    try {
+      aiData = await aiResponse.json();
+    } catch (error) {
+      console.error('AI 响应解析失败:', error);
+      return NextResponse.json({ error: 'AI 返回格式异常，请稍后再试' }, { status: 502 });
+    }
     const analysis = aiData.choices?.[0]?.message?.content?.trim();
     const statsMarkdown = buildStatsMarkdown(
       period.label,
