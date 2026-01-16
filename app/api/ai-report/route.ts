@@ -256,6 +256,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    const debugMode = request.nextUrl.searchParams.get('debug') === 'true';
     const body = await request.json();
     const { type, markViewed, periodOffset = 0, forceRefresh } = body as {
       type: ReportType;
@@ -368,6 +369,18 @@ export async function POST(request: NextRequest) {
     // 如果没有数据，返回提示
     if (dataRows.length === 0) {
       const partialNote = isPartialPeriod ? `（截至 ${actualEndDate}）` : '';
+      const debugPayload = debugMode
+        ? {
+            type,
+            period: period.label,
+            periodKey: period.periodKey,
+            periodOffset,
+            targetDate: formatDate(targetDate),
+            actualEndDate,
+            isPartialPeriod,
+            stats
+          }
+        : undefined;
       const emptyReport = `## ${period.label} 起飞报告
 
 ${partialNote}这个周期内暂无记录数据。
@@ -385,7 +398,8 @@ ${partialNote}这个周期内暂无记录数据。
       return NextResponse.json({
         report: emptyReport,
         period: period.label,
-        stats
+        stats,
+        debug: debugPayload
       });
     }
 
@@ -446,7 +460,21 @@ ${partialNote}这个周期内暂无记录数据。
       const errorText = await aiResponse.text();
       console.error('AI 请求失败:', aiResponse.status, errorText);
       return NextResponse.json({
-        error: `AI 服务请求失败 (${aiResponse.status}): ${errorText.slice(0, 200)}`
+        error: `AI 服务请求失败 (${aiResponse.status}): ${errorText.slice(0, 200)}`,
+        debug: debugMode
+          ? {
+              type,
+              period: period.label,
+              periodKey: period.periodKey,
+              periodOffset,
+              targetDate: formatDate(targetDate),
+              actualEndDate,
+              isPartialPeriod,
+              userPrompt,
+              refreshToken,
+              aiModel: config['ai_model'] || 'gpt-3.5-turbo'
+            }
+          : undefined
       }, { status: 500 });
     }
 
@@ -464,6 +492,21 @@ ${partialNote}这个周期内暂无记录数据。
       isPartialPeriod ? { actualDataDays, fullPeriodDays } : undefined
     );
     const report = analysis ? `${statsMarkdown}\n\n${analysis}` : statsMarkdown;
+    const debugPayload = debugMode
+      ? {
+          type,
+          period: period.label,
+          periodKey: period.periodKey,
+          periodOffset,
+          targetDate: formatDate(targetDate),
+          actualEndDate,
+          isPartialPeriod,
+          refreshToken,
+          aiModel: config['ai_model'] || 'gpt-3.5-turbo',
+          userPrompt,
+          analysis
+        }
+      : undefined;
 
     // 标记为已查看
     if (markViewed) {
@@ -477,7 +520,8 @@ ${partialNote}这个周期内暂无记录数据。
     return NextResponse.json({
       report,
       period: period.label,
-      stats
+      stats,
+      debug: debugPayload
     });
   } catch (error) {
     console.error('生成报告失败:', error);

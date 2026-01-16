@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, ReactElement, useCallback, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 
 type ReportType = 'week' | 'month' | 'quarter' | 'year';
 
@@ -14,6 +15,20 @@ interface ReportStats {
   totalDays: number;
   recordedDays: number;
   totalCount: number;
+}
+
+interface ReportDebugInfo {
+  type?: ReportType;
+  period?: string;
+  periodKey?: string;
+  periodOffset?: number;
+  targetDate?: string;
+  actualEndDate?: string;
+  isPartialPeriod?: boolean;
+  refreshToken?: string;
+  aiModel?: string;
+  userPrompt?: string;
+  analysis?: string;
 }
 
 const reportTypes: { type: ReportType; label: string }[] = [
@@ -35,11 +50,14 @@ function getMusicConfig(avgPerDay: number): { file: string; startTime: number } 
 }
 
 export default function ReportModal({ onClose, refreshKey }: ReportModalProps) {
+  const searchParams = useSearchParams();
+  const isDebug = searchParams.get('debug') === 'true';
   const [selectedType, setSelectedType] = useState<ReportType>('week');
   const [periodOffset, setPeriodOffset] = useState(0); // 0=当前周期，-1=上一周期
   const [report, setReport] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [debugInfo, setDebugInfo] = useState<ReportDebugInfo | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const selectedTypeRef = useRef<ReportType>('week');
   const periodOffsetRef = useRef(0);
@@ -98,6 +116,7 @@ export default function ReportModal({ onClose, refreshKey }: ReportModalProps) {
 
     setLoading(true);
     setError('');
+    setDebugInfo(null);
     if (updateSelection) {
       setSelectedType(type);
       setPeriodOffset(offset);
@@ -108,7 +127,8 @@ export default function ReportModal({ onClose, refreshKey }: ReportModalProps) {
     stopMusic(); // 加载新报告时停止音乐
 
     try {
-      const res = await fetch('/api/ai-report', {
+      const debugQuery = isDebug ? '?debug=true' : '';
+      const res = await fetch(`/api/ai-report${debugQuery}`, {
         method: 'POST',
         cache: 'no-store',
         headers: { 'Content-Type': 'application/json' },
@@ -131,7 +151,7 @@ export default function ReportModal({ onClose, refreshKey }: ReportModalProps) {
         return;
       }
 
-      const data = (await res.json()) as { report?: string; stats?: ReportStats; error?: string };
+      const data = (await res.json()) as { report?: string; stats?: ReportStats; error?: string; debug?: ReportDebugInfo };
       if (requestId !== requestIdRef.current) return;
 
       if (data.error) {
@@ -141,6 +161,9 @@ export default function ReportModal({ onClose, refreshKey }: ReportModalProps) {
         if (data.stats) {
           // 报告加载成功后播放音乐
           playMusic(data.stats.avgPerDay);
+        }
+        if (data.debug) {
+          setDebugInfo(data.debug as ReportDebugInfo);
         }
       }
     } catch (err) {
@@ -155,7 +178,7 @@ export default function ReportModal({ onClose, refreshKey }: ReportModalProps) {
         setLoading(false);
       }
     }
-  }, [stopMusic, playMusic]);
+  }, [stopMusic, playMusic, isDebug]);
 
   useEffect(() => {
     selectedTypeRef.current = selectedType;
@@ -339,6 +362,44 @@ export default function ReportModal({ onClose, refreshKey }: ReportModalProps) {
             </div>
           )}
         </div>
+
+        {isDebug && (
+          <div className="max-h-64 overflow-y-auto bg-gray-900/60 border-t border-white/10 text-xs text-gray-200 font-mono p-3 space-y-2">
+            <div className="flex justify-between items-center">
+              <span className="font-semibold">Debug</span>
+              <span>req#{requestIdRef.current} {loading ? '(loading)' : ''}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>type: {selectedTypeRef.current}</div>
+              <div>offset: {periodOffsetRef.current}</div>
+              <div>refreshKey: {refreshKey}</div>
+              <div>error: {error || 'none'}</div>
+              <div>reportLen: {report.length}</div>
+            </div>
+            {debugInfo && (
+              <>
+                <div className="border-t border-white/10 pt-2 space-y-1">
+                  <div>period: {debugInfo.period} ({debugInfo.periodKey})</div>
+                  <div>target: {debugInfo.targetDate} → {debugInfo.actualEndDate}</div>
+                  <div>partial: {debugInfo.isPartialPeriod ? 'yes' : 'no'} | model: {debugInfo.aiModel}</div>
+                  {debugInfo.refreshToken && <div>refreshToken: {debugInfo.refreshToken}</div>}
+                </div>
+                {debugInfo.userPrompt && (
+                  <details className="border-t border-white/10 pt-2">
+                    <summary className="cursor-pointer">Prompt</summary>
+                    <pre className="whitespace-pre-wrap text-gray-100">{debugInfo.userPrompt}</pre>
+                  </details>
+                )}
+                {debugInfo.analysis && (
+                  <details>
+                    <summary className="cursor-pointer">Raw Analysis</summary>
+                    <pre className="whitespace-pre-wrap text-gray-100">{debugInfo.analysis}</pre>
+                  </details>
+                )}
+              </>
+            )}
+          </div>
+        )}
 
         {/* 底部 */}
         <div className="p-4 border-t border-white/20 bg-gray-800/60 flex justify-between items-center">
