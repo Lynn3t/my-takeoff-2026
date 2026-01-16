@@ -485,6 +485,10 @@ ${partialNote}这个周期内暂无记录数据。
       console.error('AI 响应解析失败:', error);
       return NextResponse.json({ error: 'AI 返回格式异常，请稍后再试' }, { status: 502 });
     }
+    if (!aiData) {
+      return NextResponse.json({ error: 'AI 返回为空，请稍后再试' }, { status: 502 });
+    }
+
     const analysis = aiData.choices?.[0]?.message?.content?.trim();
     const statsMarkdown = buildStatsMarkdown(
       period.label,
