@@ -15,6 +15,12 @@ interface ReportStats {
   totalDays: number;
   recordedDays: number;
   totalCount: number;
+  successDays: number;
+  zeroDays: number;
+  maxCount: number;
+  maxCountDate: string;
+  streakDays: number;
+  dayOfWeekStats: Record<string, { count: number; days: number }>;
 }
 
 interface ReportDebugInfo {
@@ -29,6 +35,14 @@ interface ReportDebugInfo {
   aiModel?: string;
   userPrompt?: string;
   analysis?: string;
+  stats?: ReportStats;
+  previousPeriods?: Array<{
+    label: string;
+    totalCount: number;
+    avgPerDay: number;
+    successDays: number;
+    zeroDays: number;
+  }>;
 }
 
 const reportTypes: { type: ReportType; label: string }[] = [
@@ -384,6 +398,33 @@ export default function ReportModal({ onClose, refreshKey }: ReportModalProps) {
                   <div>partial: {debugInfo.isPartialPeriod ? 'yes' : 'no'} | model: {debugInfo.aiModel}</div>
                   {debugInfo.refreshToken && <div>refreshToken: {debugInfo.refreshToken}</div>}
                 </div>
+                {debugInfo.stats && (
+                  <div className="border-t border-white/10 pt-2 grid grid-cols-2 gap-2">
+                    <div>recordedDays: {debugInfo.stats.recordedDays}</div>
+                    <div>totalCount: {debugInfo.stats.totalCount}</div>
+                    <div>successDays: {debugInfo.stats.successDays}</div>
+                    <div>zeroDays: {debugInfo.stats.zeroDays}</div>
+                    <div>avgPerDay: {debugInfo.stats.avgPerDay.toFixed(2)}</div>
+                    <div>maxCount: {debugInfo.stats.maxCount ?? '-'}</div>
+                    <div>streak: {debugInfo.stats.streakDays}</div>
+                  </div>
+                )}
+                {debugInfo.previousPeriods && debugInfo.previousPeriods.length > 0 && (
+                  <details className="border-t border-white/10 pt-2">
+                    <summary className="cursor-pointer">Previous periods</summary>
+                    <div className="space-y-1 mt-1">
+                      {debugInfo.previousPeriods.map((p) => (
+                        <div key={p.label} className="grid grid-cols-2 gap-1">
+                          <div className="col-span-2 font-semibold text-gray-100">{p.label}</div>
+                          <div>total: {p.totalCount}</div>
+                          <div>avg/day: {p.avgPerDay.toFixed(2)}</div>
+                          <div>success: {p.successDays}</div>
+                          <div>zeros: {p.zeroDays}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                )}
                 {debugInfo.userPrompt && (
                   <details className="border-t border-white/10 pt-2">
                     <summary className="cursor-pointer">Prompt</summary>

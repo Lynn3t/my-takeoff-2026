@@ -378,7 +378,9 @@ export async function POST(request: NextRequest) {
             targetDate: formatDate(targetDate),
             actualEndDate,
             isPartialPeriod,
-            stats
+            refreshToken,
+            stats,
+            previousPeriods: previousSummaries
           }
         : undefined;
       const emptyReport = `## ${period.label} 起飞报告
@@ -425,6 +427,16 @@ ${partialNote}这个周期内暂无记录数据。
 
     const aiController = new AbortController();
     const aiTimeout = setTimeout(() => aiController.abort(), 45000);
+
+    const previousSummaries = debugMode
+      ? previousPeriods.map(p => ({
+          label: p.label,
+          totalCount: p.stats.totalCount,
+          avgPerDay: p.stats.avgPerDay,
+          successDays: p.stats.successDays,
+          zeroDays: p.stats.zeroDays
+        }))
+      : undefined;
 
     let aiResponse: Response;
     try {
@@ -508,7 +520,9 @@ ${partialNote}这个周期内暂无记录数据。
           refreshToken,
           aiModel: config['ai_model'] || 'gpt-3.5-turbo',
           userPrompt,
-          analysis
+          analysis,
+          stats,
+          previousPeriods: previousSummaries
         }
       : undefined;
 
