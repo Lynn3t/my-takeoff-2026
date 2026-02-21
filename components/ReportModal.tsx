@@ -52,6 +52,53 @@ const reportTypes: { type: ReportType; label: string }[] = [
   { type: 'year', label: '年报' }
 ];
 
+// 获取 UTC+8 今天的日期
+function getUtc8Today(): Date {
+  const now = new Date();
+  const utc8 = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+  return new Date(Date.UTC(utc8.getUTCFullYear(), utc8.getUTCMonth(), utc8.getUTCDate()));
+}
+
+// 根据类型和偏移量计算周期标签（与后端逻辑一致）
+function getPeriodLabel(type: ReportType, offset: number): string {
+  const date = getUtc8Today();
+
+  switch (type) {
+    case 'week': {
+      date.setUTCDate(date.getUTCDate() + offset * 7);
+      const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+      d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+      const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+      const week = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+      return `${d.getUTCFullYear()}年第${week}周`;
+    }
+    case 'month': {
+      date.setUTCMonth(date.getUTCMonth() + offset);
+      return `${date.getUTCFullYear()}年${date.getUTCMonth() + 1}月`;
+    }
+    case 'quarter': {
+      date.setUTCMonth(date.getUTCMonth() + offset * 3);
+      const q = Math.floor(date.getUTCMonth() / 3) + 1;
+      return `${date.getUTCFullYear()}年Q${q}`;
+    }
+    case 'year': {
+      date.setUTCFullYear(date.getUTCFullYear() + offset);
+      return `${date.getUTCFullYear()}年`;
+    }
+  }
+}
+
+// 生成周期下拉选项列表
+function getPeriodOptions(type: ReportType): { offset: number; label: string }[] {
+  const counts: Record<ReportType, number> = { week: 12, month: 12, quarter: 8, year: 3 };
+  const count = counts[type];
+  const options: { offset: number; label: string }[] = [];
+  for (let i = 0; i < count; i++) {
+    options.push({ offset: -i, label: getPeriodLabel(type, -i) });
+  }
+  return options;
+}
+
 // 根据日均次数获取音乐配置
 function getMusicConfig(avgPerDay: number): { file: string; startTime: number } {
   if (avgPerDay < 0.3) {
@@ -310,33 +357,19 @@ export default function ReportModal({ onClose, refreshKey }: ReportModalProps) {
             </button>
           ))}
 
-          {/* 周报的本周/上周切换 */}
-          {selectedType === 'week' && (
-            <div className="flex gap-1 ml-2 border-l border-white/20 pl-3">
-              <button
-                onClick={() => loadReport('week', 0)}
-                disabled={loading}
-                className={`px-3 py-1 rounded-full text-xs font-medium transition-all btn-press ${
-                  periodOffset === 0
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-white/10 text-gray-300 hover:bg-white/20'
-                } disabled:opacity-50`}
-              >
-                本周
-              </button>
-              <button
-                onClick={() => loadReport('week', -1)}
-                disabled={loading}
-                className={`px-3 py-1 rounded-full text-xs font-medium transition-all btn-press ${
-                  periodOffset === -1
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-white/10 text-gray-300 hover:bg-white/20'
-                } disabled:opacity-50`}
-              >
-                上周
-              </button>
-            </div>
-          )}
+          {/* 周期选择下拉框 */}
+          <select
+            value={periodOffset}
+            onChange={(e) => loadReport(selectedType, Number(e.target.value))}
+            disabled={loading}
+            className="ml-2 px-3 py-1.5 rounded-lg text-sm bg-gray-800 text-gray-200 border border-white/20 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50 cursor-pointer"
+          >
+            {getPeriodOptions(selectedType).map((opt) => (
+              <option key={opt.offset} value={opt.offset} className="bg-gray-800">
+                {opt.label}
+              </option>
+            ))}
+          </select>
 
           {/* 刷新按钮 */}
           <button
