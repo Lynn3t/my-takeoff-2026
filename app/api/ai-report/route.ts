@@ -378,8 +378,7 @@ export async function POST(request: NextRequest) {
             targetDate: formatDate(targetDate),
             actualEndDate,
             isPartialPeriod,
-            stats,
-            previousPeriods: previousSummaries
+            stats
           }
         : undefined;
       const emptyReport = `## ${period.label} 起飞报告
