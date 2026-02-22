@@ -378,7 +378,6 @@ export async function POST(request: NextRequest) {
             targetDate: formatDate(targetDate),
             actualEndDate,
             isPartialPeriod,
-            refreshToken,
             stats,
             previousPeriods: previousSummaries
           }
