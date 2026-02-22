@@ -158,20 +158,19 @@ const InstallPrompt = memo(function InstallPrompt() {
 // 日期单元格组件 - 使用 memo 避免不必要的重渲染
 interface DayCellProps {
   dateKey: string;
-  dayOfYear: number;
   day: number;
   text: string;
   className: string;
   onToggle: (dateKey: string) => void;
 }
 
-const DayCell = memo(function DayCell({ dateKey, dayOfYear, day, text, className, onToggle }: DayCellProps) {
+const DayCell = memo(function DayCell({ dateKey, day, text, className, onToggle }: DayCellProps) {
   return (
     <div
       onClick={() => onToggle(dateKey)}
       className={`aspect-square flex flex-col items-center justify-center text-sm rounded cursor-pointer transition-all hover:scale-105 select-none ${className}`}
     >
-      <span className="text-[8px] opacity-60 leading-none">{dayOfYear}</span>
+      <span className="text-[8px] opacity-60 leading-none">{day}</span>
       <span className="leading-none">{text || day}</span>
     </div>
   );
@@ -510,8 +509,6 @@ function HomeContent() {
 
   // 预计算日历数据 - 避免每次渲染重复计算
   const calendarData = useMemo(() => {
-    const startOfYear = new Date(year, 0, 1);
-
     return MONTHS.map((name, index) => {
       const daysInMonth = new Date(year, index + 1, 0).getDate();
       const firstDay = new Date(year, index, 1).getDay();
@@ -519,10 +516,8 @@ function HomeContent() {
       const days = Array.from({ length: daysInMonth }).map((_, i) => {
         const d = i + 1;
         const dateKey = `${year}-${String(index + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-        const currentDate = new Date(year, index, d);
-        const dayOfYear = Math.floor((currentDate.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 
-        return { d, dateKey, dayOfYear };
+        return { d, dateKey };
       });
 
       return { name, index, firstDay, days };
@@ -541,13 +536,12 @@ function HomeContent() {
           </div>
           <div className="grid grid-cols-7 gap-1">
             {Array.from({ length: firstDay }).map((_, i) => <div key={`empty-${i}`} />)}
-            {days.map(({ d, dateKey, dayOfYear }) => {
+            {days.map(({ d, dateKey }) => {
               const { text, className } = getDayStatus(dateKey);
               return (
                 <DayCell
                   key={dateKey}
                   dateKey={dateKey}
-                  dayOfYear={dayOfYear}
                   day={d}
                   text={text}
                   className={className}
